@@ -19,7 +19,7 @@ class ToothImageDataset(Dataset):
 
     # constants about receptive field for anchors
     # precalculated here https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/receptive_field
-    RECEPTIVE_FIELD = 483
+    RECEPTIVE_FIELD = 100
     EFFECTIVE_STRIDE = 32
     EFFECTIVE_PADDING = 239
 
@@ -139,7 +139,13 @@ class ToothImageDataset(Dataset):
                     for b in range(len(bboxes)):
                         ious[i, j, n, b] = IoU(anchors[i, j, n], bboxes[b])
         print(ious)
-        return ious
+        max_iou_per_anchor = np.amax(ious, axis=3)
+        positives = max_iou_per_anchor > self.POSITIVE_THRESHOLD
+        negatives = max_iou_per_anchor < self.NEGATIVE_THRESHOLD
+        print(positives)
+        print(np.max(max_iou_per_anchor))
+        pos = np.unravel_index(np.argmax(max_iou_per_anchor), max_iou_per_anchor.shape)
+        return anchors[pos]
 
     def get_label_map(self):
         #TODO: read the pbtxt file instead of hardcoding values
@@ -171,16 +177,17 @@ class ToothImageDataset(Dataset):
 
         anchors = self.get_image_anchors()
         anchors = anchors.reshape(-1, anchors.shape[-1])
-        for anchor in anchors:
-            draw.rectangle([anchor[0], anchor[1], anchor[2], anchor[3]], outline="red")
+        # for anchor in anchors:
+        #     draw.rectangle([anchor[0], anchor[1], anchor[2], anchor[3]], outline="red")
 
         bboxes = self.get_truth_bboxes(i)
         for bbox in bboxes:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
 
-        self.get_positive_anchors(self.get_image_anchors(), bboxes)
+        bbox = self.get_positive_anchors(self.get_image_anchors(), bboxes)
+        draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
 
-        # im.show()
+        im.show()
 
 dataset = ToothImageDataset('data')
 print(len(dataset))
