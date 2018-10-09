@@ -5,6 +5,7 @@ import re
 import xml.etree.ElementTree as ET
 import numpy as np
 from skimage import io
+from skimage.transform import resize
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from PIL import Image, ImageDraw
@@ -13,25 +14,28 @@ from utils import *
 class ToothImageDataset(Dataset):
     """Dataset of dental panoramic x-rays"""
 
-    INPUT_SIZE = (800, 400)
-    OUTPUT_SIZE = (30, 40)
+    INPUT_SIZE = (1600, 800)
+    OUTPUT_SIZE = (50, 25)
     OUTPUT_CELL_SIZE = float(INPUT_SIZE[0]) / float(OUTPUT_SIZE[0])
 
-    # constants about receptive field for anchors
-    # precalculated here https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/receptive_field
-    RECEPTIVE_FIELD = 100
+    # # constants about receptive field for anchors
+    # # precalculated here https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/receptive_field
+    RECEPTIVE_FIELD = 212
     EFFECTIVE_STRIDE = 32
-    EFFECTIVE_PADDING = 239
+    EFFECTIVE_PADDING = 90
+    # NUMBER_ANCHORS_WIDE = int((INPUT_SIZE[0] + 2 * EFFECTIVE_PADDING - RECEPTIVE_FIELD) / EFFECTIVE_STRIDE) + 1
+    # NUMBER_ANCHORS_HEIGHT = int((INPUT_SIZE[1] + 2 * EFFECTIVE_PADDING - RECEPTIVE_FIELD) / EFFECTIVE_STRIDE) + 1
+
 
     # anchors constants
-    ANCHORS_WIDTH_RATIOS = [0.5, 1.0, 2.0]
-    ANCHORS_HEIGHT_RATIOS = [0.5, 1.0, 2.0]
+    ANCHORS_WIDTH_RATIOS = [0.3, 0.5, 1.0]
+    ANCHORS_HEIGHT_RATIOS = [0.3, 0.5, 1.0]
 
-    NUMBER_ANCHORS_WIDE = int((INPUT_SIZE[0] + 2 * EFFECTIVE_PADDING - RECEPTIVE_FIELD) / EFFECTIVE_STRIDE) + 1
-    NUMBER_ANCHORS_HEIGHT = int((INPUT_SIZE[1] + 2 * EFFECTIVE_PADDING - RECEPTIVE_FIELD) / EFFECTIVE_STRIDE) + 1
+    NUMBER_ANCHORS_WIDE = OUTPUT_SIZE[0]
+    NUMBER_ANCHORS_HEIGHT = OUTPUT_SIZE[1]
 
     NEGATIVE_THRESHOLD = 0.3
-    POSITIVE_THRESHOLD = 0.7
+    POSITIVE_THRESHOLD = 0.5
 
     def __init__(self, root_dir):
         """
@@ -59,11 +63,7 @@ class ToothImageDataset(Dataset):
         # get the positive and negative anchors
 
         image = self.get_image(idx)
-        landmarks = self.landmarks_frame.iloc[idx, 1:].as_matrix()
-        landmarks = landmarks.astype('float').reshape(-1, 2)
-        sample = {'image': image, 'landmarks': landmarks}
-
-        return sample
+        return np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -131,21 +131,17 @@ class ToothImageDataset(Dataset):
             bboxes[:, i] = bboxes[:, i] / height_ratio
         return bboxes
 
-    def get_positive_anchors(self, anchors, bboxes):
+    def get_positive_negative_anchors(self, anchors, bboxes):
         ious = np.zeros((self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number, len(bboxes)))
         for i in range(anchors.shape[0]):
             for j in range(anchors.shape[1]):
                 for n in range(anchors.shape[2]):
                     for b in range(len(bboxes)):
                         ious[i, j, n, b] = IoU(anchors[i, j, n], bboxes[b])
-        print(ious)
         max_iou_per_anchor = np.amax(ious, axis=3)
         positives = max_iou_per_anchor > self.POSITIVE_THRESHOLD
         negatives = max_iou_per_anchor < self.NEGATIVE_THRESHOLD
-        print(positives)
-        print(np.max(max_iou_per_anchor))
-        pos = np.unravel_index(np.argmax(max_iou_per_anchor), max_iou_per_anchor.shape)
-        return anchors[pos]
+        return anchors[np.where(positives)], anchors[np.where(negatives)]
 
     def get_label_map(self):
         #TODO: read the pbtxt file instead of hardcoding values
@@ -175,22 +171,37 @@ class ToothImageDataset(Dataset):
 
         draw = ImageDraw.Draw(im)
 
-        anchors = self.get_image_anchors()
-        anchors = anchors.reshape(-1, anchors.shape[-1])
-        # for anchor in anchors:
-        #     draw.rectangle([anchor[0], anchor[1], anchor[2], anchor[3]], outline="red")
-
         bboxes = self.get_truth_bboxes(i)
         for bbox in bboxes:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
 
-        bbox = self.get_positive_anchors(self.get_image_anchors(), bboxes)
-        draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
+        positives, negatives = self.get_positive_negative_anchors(self.get_image_anchors(), bboxes)
+        for bbox in positives:
+            draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
 
         im.show()
 
+    def parametrize(self, anchor, bbox):
+        x1, y1, x2, y2 = anchor
+        x3, y3, x4, y4 = bbox
+
+        xa = (x1 + x2) / 2.0
+        yb = (y1 + y2) / 2.0
+        wa = x2 - x1
+        ha = y2 - y1
+
+        xs = (x3 + x4) / 2.0
+        ys = (y3 + y4) / 2.0
+        ws = x4 - x3
+        hs = y4 - y3
+
+        tx = (xs - xa) / wa
+        ty = (ys - ya) / ha
+        tw = np.log(ws / wa)
+        th = np.log(hs / ha)
+        return (tx, ty, tw, th)
+
 dataset = ToothImageDataset('data')
-print(len(dataset))
-print(dataset.label_map)
-dataset.get_truth_bboxes(2)
 dataset.visualise_anchors_on_image(2)
+dataset.visualise_anchors_on_image(3)
+dataset.visualise_anchors_on_image(4)

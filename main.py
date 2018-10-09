@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 import torchvision.models as models
-
+from dataset import *
 
 class RPN(nn.Module):
     def __init__(self):
@@ -18,9 +18,9 @@ class RPN(nn.Module):
         self.anchor_number = 9
 
         # get the feature map from last conv layer
-        resnet = models.resnet101(pretrained=True)
-        print(list(resnet.children())[:-2])
-        self.feature_map = nn.Sequential(*list(resnet.children())[:-2])
+        resnet = models.vgg16(pretrained=True)
+        # print(list(resnet.children())[:-1])
+        self.feature_map = nn.Sequential(*list(resnet.children())[:-1])
         # define the convrelu layers processing input feature map
 
         self.RPN_conv = nn.Conv2d(self.in_dim, 512, 3, 1, 1, bias=True)
@@ -33,12 +33,18 @@ class RPN(nn.Module):
 
 
     def forward(self, x):
-       rpn_conv = F.relu(self.RPN_conv(self.feature_map(x)))
-       cls = self.cls_layer(rpn_conv)
-       reg = self.reg_layer(rpn_conv)
+        rpn_conv = F.relu(self.RPN_conv(self.feature_map(x)))
+        cls = self.cls_layer(rpn_conv)
+        reg = self.reg_layer(rpn_conv)
 
+        reg_loss = nn.SmoothL1Loss(reg, x.reg)
+        cls_loss
 
-       return 0
+        return 0
 
 
 rpn = RPN()
+dataset = ToothImageDataset('data')
+
+print(dataset[2].shape)
+rpn(torch.FloatTensor(dataset[2]))
