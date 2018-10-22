@@ -54,16 +54,19 @@ class ToothImageDataset(Dataset):
     def __len__(self):
         return len(self.tooth_images_paths)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, i):
         """
         Sample format: dict {image, anchors, cls_results, p_star}
         """
-        # TODO
-        # Get the image
-        # get the positive and negative anchors
 
-        image = self.get_image(idx)
-        return np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
+        image = self.get_image(i)
+        bboxes = self.get_truth_bboxes(i)
+        anchors = self.get_image_anchors()
+        positives, negatives, truth_bbox, cls_truth = self.get_positive_negative_anchors(anchors, bboxes)
+        reg_truth = self.parametrize(anchors, truth_bbox)
+        print(cls_truth.shape)
+        im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
+        return torch.from_numpy(im), torch.from_numpy(reg_truth), torch.from_numpy(cls_truth), torch.from_numpy(positives), torch.from_numpy(negatives)
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -138,10 +141,14 @@ class ToothImageDataset(Dataset):
                 for n in range(anchors.shape[2]):
                     for b in range(len(bboxes)):
                         ious[i, j, n, b] = IoU(anchors[i, j, n], bboxes[b])
+
+        arg_truth_bbox = np.argmax(ious, axis=3).flatten()
+        truth_bbox = bboxes[arg_truth_bbox, :].reshape(ious.shape[:3] + (bboxes.shape[-1],))
+
         max_iou_per_anchor = np.amax(ious, axis=3)
         positives = max_iou_per_anchor > self.POSITIVE_THRESHOLD
         negatives = max_iou_per_anchor < self.NEGATIVE_THRESHOLD
-        return anchors[np.where(positives)], anchors[np.where(negatives)]
+        return anchors[np.where(positives)], anchors[np.where(negatives)], truth_bbox, positives.astype(int)
 
     def get_label_map(self):
         #TODO: read the pbtxt file instead of hardcoding values
@@ -175,33 +182,23 @@ class ToothImageDataset(Dataset):
         for bbox in bboxes:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
 
-        positives, negatives = self.get_positive_negative_anchors(self.get_image_anchors(), bboxes)
+        positives, negatives, truth_bbox = self.get_positive_negative_anchors(self.get_image_anchors(), bboxes)
         for bbox in positives:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
 
-        im.show()
+        # im.show()
 
-    def parametrize(self, anchor, bbox):
-        x1, y1, x2, y2 = anchor
-        x3, y3, x4, y4 = bbox
+    def parametrize(self, anchors, bboxes):
+        reg = np.zeros(anchors.shape, dtype = np.float32)
 
-        xa = (x1 + x2) / 2.0
-        yb = (y1 + y2) / 2.0
-        wa = x2 - x1
-        ha = y2 - y1
+        reg[:, 0] = (bboxes[:, 0] - anchors[:, 0]) / (anchors[:, 2] - anchors[:, 0])
+        reg[:, 1] = (bboxes[:, 1] - anchors[:, 1]) / (anchors[:, 3] - anchors[:, 1])
+        reg[:, 2] = np.log((bboxes[:, 2] - bboxes[:, 0]) / (anchors[:, 2] - anchors[:, 0]) )
+        reg[:, 3] = np.log((bboxes[:, 3] - bboxes[:, 1]) / (anchors[:, 3] - anchors[:, 1]) )
 
-        xs = (x3 + x4) / 2.0
-        ys = (y3 + y4) / 2.0
-        ws = x4 - x3
-        hs = y4 - y3
+        return reg
 
-        tx = (xs - xa) / wa
-        ty = (ys - ya) / ha
-        tw = np.log(ws / wa)
-        th = np.log(hs / ha)
-        return (tx, ty, tw, th)
-
-dataset = ToothImageDataset('data')
-dataset.visualise_anchors_on_image(2)
-dataset.visualise_anchors_on_image(3)
-dataset.visualise_anchors_on_image(4)
+# dataset = ToothImageDataset('data')
+# dataset.visualise_anchors_on_image(2)
+# dataset.visualise_anchors_on_image(3)
+# dataset.visualise_anchors_on_image(4)
