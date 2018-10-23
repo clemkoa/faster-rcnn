@@ -64,7 +64,6 @@ class ToothImageDataset(Dataset):
         anchors = self.get_image_anchors()
         positives, negatives, truth_bbox, cls_truth = self.get_positive_negative_anchors(anchors, bboxes)
         reg_truth = self.parametrize(anchors, truth_bbox)
-        print(cls_truth.shape)
         im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
         return torch.from_numpy(im), torch.from_numpy(reg_truth), torch.from_numpy(cls_truth), torch.from_numpy(positives), torch.from_numpy(negatives)
 
@@ -170,6 +169,16 @@ class ToothImageDataset(Dataset):
         }
         return inverse_label_map
 
+    def parametrize(self, anchors, bboxes):
+        reg = np.zeros(anchors.shape, dtype = np.float32)
+
+        reg[:, 0] = (bboxes[:, 0] - anchors[:, 0]) / (anchors[:, 2] - anchors[:, 0])
+        reg[:, 1] = (bboxes[:, 1] - anchors[:, 1]) / (anchors[:, 3] - anchors[:, 1])
+        reg[:, 2] = np.log((bboxes[:, 2] - bboxes[:, 0]) / (anchors[:, 2] - anchors[:, 0]) )
+        reg[:, 3] = np.log((bboxes[:, 3] - bboxes[:, 1]) / (anchors[:, 3] - anchors[:, 1]) )
+
+        return reg
+
     def visualise_anchors_on_image(self, i):
         image = self.get_image(i)
         temp_im = Image.fromarray(image).resize(self.INPUT_SIZE)
@@ -186,19 +195,4 @@ class ToothImageDataset(Dataset):
         for bbox in positives:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
 
-        # im.show()
-
-    def parametrize(self, anchors, bboxes):
-        reg = np.zeros(anchors.shape, dtype = np.float32)
-
-        reg[:, 0] = (bboxes[:, 0] - anchors[:, 0]) / (anchors[:, 2] - anchors[:, 0])
-        reg[:, 1] = (bboxes[:, 1] - anchors[:, 1]) / (anchors[:, 3] - anchors[:, 1])
-        reg[:, 2] = np.log((bboxes[:, 2] - bboxes[:, 0]) / (anchors[:, 2] - anchors[:, 0]) )
-        reg[:, 3] = np.log((bboxes[:, 3] - bboxes[:, 1]) / (anchors[:, 3] - anchors[:, 1]) )
-
-        return reg
-
-# dataset = ToothImageDataset('data')
-# dataset.visualise_anchors_on_image(2)
-# dataset.visualise_anchors_on_image(3)
-# dataset.visualise_anchors_on_image(4)
+        im.show()
