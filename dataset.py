@@ -21,11 +21,6 @@ class ToothImageDataset(Dataset):
     # # constants about receptive field for anchors
     # # precalculated here https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/receptive_field
     RECEPTIVE_FIELD = 212
-    EFFECTIVE_STRIDE = 32
-    EFFECTIVE_PADDING = 90
-    # NUMBER_ANCHORS_WIDE = int((INPUT_SIZE[0] + 2 * EFFECTIVE_PADDING - RECEPTIVE_FIELD) / EFFECTIVE_STRIDE) + 1
-    # NUMBER_ANCHORS_HEIGHT = int((INPUT_SIZE[1] + 2 * EFFECTIVE_PADDING - RECEPTIVE_FIELD) / EFFECTIVE_STRIDE) + 1
-
 
     # anchors constants
     ANCHORS_WIDTH_RATIOS = [0.3, 0.5, 1.0]
@@ -36,6 +31,8 @@ class ToothImageDataset(Dataset):
 
     NEGATIVE_THRESHOLD = 0.3
     POSITIVE_THRESHOLD = 0.5
+
+    LOSS_SELECTED_ANCHORS = 256
 
     def __init__(self, root_dir):
         """
@@ -65,7 +62,8 @@ class ToothImageDataset(Dataset):
         positives, negatives, truth_bbox, cls_truth = self.get_positive_negative_anchors(anchors, bboxes)
         reg_truth = self.parametrize(anchors, truth_bbox)
         im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
-        return torch.from_numpy(im), torch.from_numpy(reg_truth), torch.from_numpy(cls_truth), torch.from_numpy(positives), torch.from_numpy(negatives)
+
+        return torch.from_numpy(im), torch.from_numpy(reg_truth), torch.from_numpy(cls_truth.astype(int)), torch.from_numpy(positives), torch.from_numpy(negatives)
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -147,7 +145,7 @@ class ToothImageDataset(Dataset):
         max_iou_per_anchor = np.amax(ious, axis=3)
         positives = max_iou_per_anchor > self.POSITIVE_THRESHOLD
         negatives = max_iou_per_anchor < self.NEGATIVE_THRESHOLD
-        return anchors[np.where(positives)], anchors[np.where(negatives)], truth_bbox, positives.astype(int)
+        return anchors[np.where(positives)], anchors[np.where(negatives)], truth_bbox, positives
 
     def get_label_map(self):
         #TODO: read the pbtxt file instead of hardcoding values
@@ -177,7 +175,10 @@ class ToothImageDataset(Dataset):
         reg[:, 2] = np.log((bboxes[:, 2] - bboxes[:, 0]) / (anchors[:, 2] - anchors[:, 0]) )
         reg[:, 3] = np.log((bboxes[:, 3] - bboxes[:, 1]) / (anchors[:, 3] - anchors[:, 1]) )
 
-        return reg
+        reg[reg > 2000] = 0.0
+        reg[reg < -2000] = 0.0
+
+        return np.nan_to_num(reg)
 
     def visualise_anchors_on_image(self, i):
         image = self.get_image(i)
