@@ -59,11 +59,11 @@ class ToothImageDataset(Dataset):
         image = self.get_image(i)
         bboxes = self.get_truth_bboxes(i)
         anchors = self.get_image_anchors()
-        positives, negatives, truth_bbox, cls_truth = self.get_positive_negative_anchors(anchors, bboxes)
-        reg_truth = self.parametrize(anchors, truth_bbox)
+        positive_anchors, negative_anchors, truth_bbox, cls_target = self.get_positive_negative_anchors(anchors, bboxes)
+        reg_target = self.parametrize(anchors, truth_bbox)
         im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
 
-        return torch.from_numpy(im), torch.from_numpy(reg_truth), torch.from_numpy(cls_truth.astype(int)), torch.from_numpy(positives), torch.from_numpy(negatives)
+        return torch.from_numpy(im), torch.from_numpy(reg_target), torch.from_numpy(cls_target.astype(int)), torch.from_numpy(positive_anchors), torch.from_numpy(negative_anchors)
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -170,13 +170,10 @@ class ToothImageDataset(Dataset):
     def parametrize(self, anchors, bboxes):
         reg = np.zeros(anchors.shape, dtype = np.float32)
 
-        reg[:, 0] = (bboxes[:, 0] - anchors[:, 0]) / (anchors[:, 2] - anchors[:, 0])
-        reg[:, 1] = (bboxes[:, 1] - anchors[:, 1]) / (anchors[:, 3] - anchors[:, 1])
-        reg[:, 2] = np.log((bboxes[:, 2] - bboxes[:, 0]) / (anchors[:, 2] - anchors[:, 0]) )
-        reg[:, 3] = np.log((bboxes[:, 3] - bboxes[:, 1]) / (anchors[:, 3] - anchors[:, 1]) )
-
-        reg[reg > 2000] = 0.0
-        reg[reg < -2000] = 0.0
+        reg[:, :, :, 0] = (bboxes[:, :, :, 0] - anchors[:, :, :, 0]) / (anchors[:, :, :, 2] - anchors[:, :, :, 0])
+        reg[:, :, :, 1] = (bboxes[:, :, :, 1] - anchors[:, :, :, 1]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1])
+        reg[:, :, :, 2] = np.log((bboxes[:, :, :, 2] - bboxes[:, :, :, 0]) / (anchors[:, :, :, 2] - anchors[:, :, :, 0]) )
+        reg[:, :, :, 3] = np.log((bboxes[:, :, :, 3] - bboxes[:, :, :, 1]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1]) )
 
         return np.nan_to_num(reg)
 

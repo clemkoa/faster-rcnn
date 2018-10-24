@@ -30,7 +30,7 @@ def train():
         loss.backward()
         optimizer.step()
 
-        print('[%d] loss: %.3f' % (i + 1, loss.item() / 2000))
+        print('[%d] loss: %.5f' % (i, loss.item()))
 
     print('Finished Training')
 
