@@ -29,6 +29,6 @@ class RPN(nn.Module):
         cls_output = self.cls_layer(rpn_conv)
         reg_output = self.reg_layer(rpn_conv)
 
-        cls_output = cls_output.view(50, 25, 9, 2)
-        reg_output = reg_output.view(50, 25, 9, 4)
+        cls_output = cls_output.view(-1, 2)
+        reg_output = reg_output.view(-1, 4)
         return cls_output, reg_output

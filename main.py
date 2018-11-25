@@ -11,14 +11,14 @@ from dataset import *
 from rpn import RPN
 
 def train():
-    lamb = 0.001
+    lamb = 0.01
     rpn = RPN()
-    dataset = ToothImageDataset('data')
-
     optimizer = optim.SGD(rpn.parameters(), lr = 0.001, momentum=0.9)
 
+    dataset = ToothImageDataset('data')
+
     for i in range(1, len(dataset)):
-        im, reg_truth, cls_truth, positives, negatives = dataset[i]
+        im, reg_truth, cls_truth, selected_indices = dataset[i]
 
         optimizer.zero_grad()
 

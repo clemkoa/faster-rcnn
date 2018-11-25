@@ -32,7 +32,7 @@ class ToothImageDataset(Dataset):
     NEGATIVE_THRESHOLD = 0.3
     POSITIVE_THRESHOLD = 0.5
 
-    LOSS_SELECTED_ANCHORS = 256
+    ANCHOR_SAMPLING_SIZE = 256
 
     def __init__(self, root_dir):
         """
@@ -59,11 +59,19 @@ class ToothImageDataset(Dataset):
         image = self.get_image(i)
         bboxes = self.get_truth_bboxes(i)
         anchors = self.get_image_anchors()
-        positive_anchors, negative_anchors, truth_bbox, cls_target = self.get_positive_negative_anchors(anchors, bboxes)
-        reg_target = self.parametrize(anchors, truth_bbox)
         im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
+        # TODO variable renaming
+        positive_anchors, negative_anchors, truth_bbox, cls_target, negatives = self.get_positive_negative_anchors(anchors, bboxes)
+        reg_target = self.parametrize(anchors, truth_bbox)
 
-        return torch.from_numpy(im), torch.from_numpy(reg_target), torch.from_numpy(cls_target.astype(int)), torch.from_numpy(positive_anchors), torch.from_numpy(negative_anchors)
+        indices = np.array([i for i in range(len(anchors.reshape((-1, 4))))])
+        positive_indices = indices[cls_target.reshape(-1)]
+        negative_indices = indices[negatives.reshape(-1)]
+
+        random_positives = np.random.permutation(positive_indices)[:ANCHOR_SAMPLING_SIZE / 2]
+        random_negatives = np.random.permutation(negative_indices)[:ANCHOR_SAMPLING_SIZE - len(random_positives)]
+        selected_indices = np.concatenate((random_positives, random_negatives))
+        return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(cls_target.astype(int).reshape((-1, 2))), selected_indices
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -145,7 +153,7 @@ class ToothImageDataset(Dataset):
         max_iou_per_anchor = np.amax(ious, axis=3)
         positives = max_iou_per_anchor > self.POSITIVE_THRESHOLD
         negatives = max_iou_per_anchor < self.NEGATIVE_THRESHOLD
-        return anchors[np.where(positives)], anchors[np.where(negatives)], truth_bbox, positives
+        return anchors[np.where(positives)], anchors[np.where(negatives)], truth_bbox, positives, negatives
 
     def get_label_map(self):
         #TODO: read the pbtxt file instead of hardcoding values
