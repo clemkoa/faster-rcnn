@@ -11,22 +11,26 @@ from dataset import *
 from rpn import RPN
 
 def train():
-    lamb = 0.01
+    lamb = 10.0
     rpn = RPN()
-    optimizer = optim.SGD(rpn.parameters(), lr = 0.001, momentum=0.9)
+    optimizer = optim.Adagrad(rpn.parameters(), lr = 0.0001)
 
     dataset = ToothImageDataset('data')
 
     for i in range(1, len(dataset)):
-        im, reg_truth, cls_truth, selected_indices = dataset[i]
-
-        optimizer.zero_grad()
+        im, reg_truth, cls_truth, selected_indices, positives = dataset[i]
+        print(positives)
 
         cls_output, reg_output = rpn(im.float())
-        reg_loss = F.smooth_l1_loss(reg_output, reg_truth)
-        cls_loss = F.cross_entropy(cls_output.view((-1, 2)), cls_truth.view(-1))
-        loss = cls_loss + lamb * reg_loss
+        if len(positives):
+            reg_loss = F.smooth_l1_loss(reg_output[positives], reg_truth[positives])
+        else:
+            reg_loss = Variable(torch.Tensor([0]))
+        cls_loss = F.cross_entropy(cls_output.view((-1, 2))[selected_indices], cls_truth.view(-1)[selected_indices])
+        print(cls_loss, reg_loss)
+        loss = cls_loss.mean() + lamb * reg_loss.mean()
 
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 

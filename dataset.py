@@ -60,18 +60,16 @@ class ToothImageDataset(Dataset):
         bboxes = self.get_truth_bboxes(i)
         anchors = self.get_image_anchors()
         im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
-        # TODO variable renaming
-        positive_anchors, negative_anchors, truth_bbox, cls_target, negatives = self.get_positive_negative_anchors(anchors, bboxes)
+        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
         reg_target = self.parametrize(anchors, truth_bbox)
 
         indices = np.array([i for i in range(len(anchors.reshape((-1, 4))))])
-        positive_indices = indices[cls_target.reshape(-1)]
+        positive_indices = indices[positives.reshape(-1)]
         negative_indices = indices[negatives.reshape(-1)]
-
-        random_positives = np.random.permutation(positive_indices)[:ANCHOR_SAMPLING_SIZE / 2]
-        random_negatives = np.random.permutation(negative_indices)[:ANCHOR_SAMPLING_SIZE - len(random_positives)]
+        random_positives = np.random.permutation(positive_indices)[:self.ANCHOR_SAMPLING_SIZE // 2]
+        random_negatives = np.random.permutation(negative_indices)[:self.ANCHOR_SAMPLING_SIZE - len(random_positives)]
         selected_indices = np.concatenate((random_positives, random_negatives))
-        return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(cls_target.astype(int).reshape((-1, 2))), selected_indices
+        return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(positives.astype(int).reshape((-1, 2))), selected_indices, positive_indices
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -132,6 +130,9 @@ class ToothImageDataset(Dataset):
         classes = [self.inverse_label_map[c[0].text] for c in raw_boxes]
         # TODO be sure that the order is always the same (xmin, ymin, xmax, ymax)
         bboxes = np.array([[[int(d.text) for d in c] for c in object if c.tag == 'bndbox'] for object in raw_boxes])
+        if not len(bboxes):
+            return np.array([])
+
         bboxes = bboxes.reshape(-1, bboxes.shape[-1])
         for i in [0, 2]:
             bboxes[:, i] = bboxes[:, i] / width_ratio
@@ -140,20 +141,25 @@ class ToothImageDataset(Dataset):
         return bboxes
 
     def get_positive_negative_anchors(self, anchors, bboxes):
+        if not len(bboxes):
+            ious = np.zeros((self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number))
+            positives = ious > self.POSITIVE_THRESHOLD
+            negatives = ious < self.NEGATIVE_THRESHOLD
+            return np.array([]), positives, negatives
+
         ious = np.zeros((self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number, len(bboxes)))
         for i in range(anchors.shape[0]):
             for j in range(anchors.shape[1]):
                 for n in range(anchors.shape[2]):
                     for b in range(len(bboxes)):
                         ious[i, j, n, b] = IoU(anchors[i, j, n], bboxes[b])
-
         arg_truth_bbox = np.argmax(ious, axis=3).flatten()
         truth_bbox = bboxes[arg_truth_bbox, :].reshape(ious.shape[:3] + (bboxes.shape[-1],))
 
         max_iou_per_anchor = np.amax(ious, axis=3)
         positives = max_iou_per_anchor > self.POSITIVE_THRESHOLD
         negatives = max_iou_per_anchor < self.NEGATIVE_THRESHOLD
-        return anchors[np.where(positives)], anchors[np.where(negatives)], truth_bbox, positives, negatives
+        return truth_bbox, positives, negatives
 
     def get_label_map(self):
         #TODO: read the pbtxt file instead of hardcoding values
@@ -177,6 +183,8 @@ class ToothImageDataset(Dataset):
 
     def parametrize(self, anchors, bboxes):
         reg = np.zeros(anchors.shape, dtype = np.float32)
+        if not len(bboxes):
+            return reg
 
         reg[:, :, :, 0] = (bboxes[:, :, :, 0] - anchors[:, :, :, 0]) / (anchors[:, :, :, 2] - anchors[:, :, :, 0])
         reg[:, :, :, 1] = (bboxes[:, :, :, 1] - anchors[:, :, :, 1]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1])
