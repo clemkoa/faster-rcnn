@@ -42,8 +42,8 @@ class ToothImageDataset(Dataset):
         self.root_dir = root_dir
         self.label_map_path = os.path.join(root_dir, 'pascal_label_map.pbtxt')
         self.tooth_images_paths = os.listdir(os.path.join(root_dir, 'Annotations'))
-        self.label_map = self.get_label_map()
-        self.inverse_label_map = self.get_inverse_label_map()
+        self.label_map = self.get_label_map(self.label_map_path)
+        self.inverse_label_map = self.get_inverse_label_map(self.label_map_path)
 
         self.anchor_dimensions = self.get_anchor_dimensions()
         self.anchor_number = len(self.anchor_dimensions)
@@ -52,10 +52,6 @@ class ToothImageDataset(Dataset):
         return len(self.tooth_images_paths)
 
     def __getitem__(self, i):
-        """
-        Sample format: dict {image, anchors, cls_results, p_star}
-        """
-
         image = self.get_image(i)
         bboxes = self.get_truth_bboxes(i)
         anchors = self.get_image_anchors()
@@ -64,11 +60,7 @@ class ToothImageDataset(Dataset):
         reg_target = self.parametrize(anchors, truth_bbox)
 
         indices = np.array([i for i in range(len(anchors.reshape((-1, 4))))])
-        positive_indices = indices[positives.reshape(-1)]
-        negative_indices = indices[negatives.reshape(-1)]
-        random_positives = np.random.permutation(positive_indices)[:self.ANCHOR_SAMPLING_SIZE // 2]
-        random_negatives = np.random.permutation(negative_indices)[:self.ANCHOR_SAMPLING_SIZE - len(random_positives)]
-        selected_indices = np.concatenate((random_positives, random_negatives))
+        selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
         return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(positives.astype(int).reshape((-1, 2))), selected_indices, positive_indices
 
     def get_anchor_dimensions(self):
@@ -81,6 +73,14 @@ class ToothImageDataset(Dataset):
     def get_image(self, i):
         path = os.path.join(self.root_dir, 'JPEGImages', str(i) + '.png')
         return io.imread(path)
+
+    def get_selected_indices_sample(self, indices, positives, negatives):
+        positive_indices = indices[positives.reshape(-1)]
+        negative_indices = indices[negatives.reshape(-1)]
+        random_positives = np.random.permutation(positive_indices)[:self.ANCHOR_SAMPLING_SIZE // 2]
+        random_negatives = np.random.permutation(negative_indices)[:self.ANCHOR_SAMPLING_SIZE - len(random_positives)]
+        selected_indices = np.concatenate((random_positives, random_negatives))
+        return selected_indices, positive_indices
 
     def get_anchors_at_position(self, pos):
         """
@@ -103,8 +103,6 @@ class ToothImageDataset(Dataset):
         return anchors
 
     def get_image_anchors(self):
-        # TODO
-        # returns something (self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number, 4)
         anchors = np.zeros((self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number, 4))
 
         for i in range(self.NUMBER_ANCHORS_WIDE):
@@ -161,25 +159,11 @@ class ToothImageDataset(Dataset):
         negatives = max_iou_per_anchor < self.NEGATIVE_THRESHOLD
         return truth_bbox, positives, negatives
 
-    def get_label_map(self):
-        #TODO: read the pbtxt file instead of hardcoding values
-        label_map = {
-            1: 'root',
-            2: 'implant',
-            3: 'restoration',
-            4: 'endodontic',
-        }
-        return label_map
+    def get_label_map(self, label_map_path):
+        return get_label_map_from_pbtxt(label_map_path)
 
-    def get_inverse_label_map(self):
-        #TODO: read the pbtxt file instead of hardcoding values
-        inverse_label_map = {
-            'root': 1,
-            'implant': 2,
-            'restoration': 3,
-            'endodontic': 4,
-        }
-        return inverse_label_map
+    def get_inverse_label_map(self, label_map_path):
+        return get_inverse_label_map_from_pbtxt(label_map_path)
 
     def parametrize(self, anchors, bboxes):
         reg = np.zeros(anchors.shape, dtype = np.float32)
