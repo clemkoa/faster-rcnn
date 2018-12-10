@@ -12,7 +12,9 @@ from rpn import RPN
 
 def train():
     lamb = 10.0
+    MODEL_PATH = 'test.pt'
     rpn = RPN()
+    rpn.load_state_dict(torch.load(MODEL_PATH))
     optimizer = optim.Adagrad(rpn.parameters(), lr = 0.0001)
 
     dataset = ToothImageDataset('data')
@@ -33,6 +35,8 @@ def train():
 
         print('[%d] loss: %.5f' % (i, loss.item()))
 
+        if i % 10 == 0:
+            torch.save(rpn.state_dict(), MODEL_PATH)
     print('Finished Training')
 
 train()
