@@ -61,6 +61,7 @@ class ToothImageDataset(Dataset):
 
         indices = np.array([i for i in range(len(anchors.reshape((-1, 4))))])
         selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
+        # F.cross_entropy does not take a one-hot vector as target, but a class index vector
         return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(positives.astype(int).reshape((-1, 2))), selected_indices, positive_indices
 
     def get_anchor_dimensions(self):
@@ -86,8 +87,8 @@ class ToothImageDataset(Dataset):
         """
         position (x, y)
         """
-        # returns something (self.anchor_number, 4)
-        # each anchor is (x, y, w, h)
+        # dimensions of an anchor: (self.anchor_number, 4)
+        # each anchor is [x, y, w, h]
         x, y = pos
         anchors = np.zeros((self.anchor_number, 4))
         for i in range(self.anchor_number):
@@ -176,6 +177,33 @@ class ToothImageDataset(Dataset):
         reg[:, :, :, 3] = np.log((bboxes[:, :, :, 3] - bboxes[:, :, :, 1]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1]) )
 
         return np.nan_to_num(reg)
+
+    def unparametrize(self, anchors, reg):
+        reg = reg.reshape(anchors.shape)
+        bboxes = np.zeros(anchors.shape, dtype = np.float32)
+
+        bboxes[:, :, :, 0] = (anchors[:, :, :, 2] - anchors[:, :, :, 0]) * reg[:, :, :, 0] + anchors[:, :, :, 0]
+        bboxes[:, :, :, 1] = (anchors[:, :, :, 3] - anchors[:, :, :, 1]) * reg[:, :, :, 1] + anchors[:, :, :, 1]
+        bboxes[:, :, :, 2] = (anchors[:, :, :, 2] - anchors[:, :, :, 0]) * np.exp(reg[:, :, :, 2]) + bboxes[:, :, :, 0]
+        bboxes[:, :, :, 3] = (anchors[:, :, :, 3] - anchors[:, :, :, 1]) * np.exp(reg[:, :, :, 3]) + bboxes[:, :, :, 1]
+
+        return bboxes
+
+    def visualise_proposals_on_image(self, reg, cls, i):
+        image = self.get_image(i)
+        temp_im = Image.fromarray(image).resize(self.INPUT_SIZE)
+        im = Image.new("RGBA", temp_im.size)
+        im.paste(temp_im)
+
+        draw = ImageDraw.Draw(im)
+
+        anchors = self.get_image_anchors()
+        bboxes = self.unparametrize(anchors, reg)
+        cls = np.argmax(cls, axis=1)
+        for bbox in reg[np.where(cls == 1)]:
+            draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
+
+        im.show()
 
     def visualise_anchors_on_image(self, i):
         image = self.get_image(i)
