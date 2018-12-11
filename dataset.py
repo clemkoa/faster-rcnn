@@ -198,9 +198,12 @@ class ToothImageDataset(Dataset):
         draw = ImageDraw.Draw(im)
 
         anchors = self.get_image_anchors()
-        bboxes = self.unparametrize(anchors, reg)
+        bboxes = self.unparametrize(anchors, reg).reshape((-1, 4))
+
+        cls[cls <= 0.5] = 0.0
         cls = np.argmax(cls, axis=1)
-        for bbox in reg[np.where(cls == 1)]:
+
+        for bbox in bboxes[np.where(cls == 1)]:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
 
         im.show()

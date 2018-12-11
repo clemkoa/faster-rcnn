@@ -55,3 +55,4 @@ def infer():
         dataset.visualise_proposals_on_image(reg.detach().numpy(), cls.detach().numpy(), i)
 
 infer()
+# train()
