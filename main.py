@@ -12,10 +12,11 @@ from rpn import RPN
 
 def train():
     lamb = 10.0
-    MODEL_PATH = 'test.pt'
-    rpn = RPN()
+    model = 'resnet50'
+    MODEL_PATH = f'{model}.pt'
+    rpn = RPN(model=model)
     rpn.load_state_dict(torch.load(MODEL_PATH))
-    optimizer = optim.Adagrad(rpn.parameters(), lr = 0.0001)
+    optimizer = optim.Adagrad(rpn.parameters(), lr = 0.00005)
 
     dataset = ToothImageDataset('data')
 
@@ -54,5 +55,5 @@ def infer():
         cls, reg = rpn(im.float())
         dataset.visualise_proposals_on_image(reg.detach().numpy(), cls.detach().numpy(), i)
 
-infer()
-# train()
+# infer()
+train()
