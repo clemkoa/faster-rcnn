@@ -7,16 +7,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from dataset import *
+from dataset import ToothImageDataset
 from rpn import RPN
 
 def train():
+    save_range = 20
     lamb = 10.0
     model = 'resnet50'
     MODEL_PATH = f'{model}.pt'
     rpn = RPN(model=model)
-    rpn.load_state_dict(torch.load(MODEL_PATH))
-    optimizer = optim.Adagrad(rpn.parameters(), lr = 0.00005)
+    if os.path.isfile(MODEL_PATH):
+        rpn.load_state_dict(torch.load(MODEL_PATH))
+    optimizer = optim.Adagrad(rpn.parameters(), lr = 0.0001)
 
     dataset = ToothImageDataset('data')
 
@@ -38,13 +40,14 @@ def train():
 
         print('[%d] loss: %.5f' % (i, loss.item()))
 
-        if i % 10 == 0:
+        if i % save_range == 0:
             torch.save(rpn.state_dict(), MODEL_PATH)
     print('Finished Training')
 
 def infer():
-    MODEL_PATH = 'test.pt'
-    rpn = RPN()
+    model = 'resnet50'
+    MODEL_PATH = f'{model}.pt'
+    rpn = RPN(model=model)
     rpn.load_state_dict(torch.load(MODEL_PATH))
 
     dataset = ToothImageDataset('data')

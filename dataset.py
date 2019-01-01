@@ -18,13 +18,11 @@ class ToothImageDataset(Dataset):
     OUTPUT_SIZE = (50, 25)
     OUTPUT_CELL_SIZE = float(INPUT_SIZE[0]) / float(OUTPUT_SIZE[0])
 
-    # # constants about receptive field for anchors
-    # # precalculated here https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/receptive_field
-    RECEPTIVE_FIELD = 212
+    ANCHOR_STANDARD_SIZE = 512
 
     # anchors constants
-    ANCHORS_WIDTH_RATIOS = [0.3, 0.5, 1.0]
-    ANCHORS_HEIGHT_RATIOS = [0.3, 0.5, 1.0]
+    ANCHORS_WIDTH_RATIOS = [0.1, 0.2, 0.3]
+    ANCHORS_HEIGHT_RATIOS = [0.1, 0.2, 0.3]
 
     NUMBER_ANCHORS_WIDE = OUTPUT_SIZE[0]
     NUMBER_ANCHORS_HEIGHT = OUTPUT_SIZE[1]
@@ -95,8 +93,8 @@ class ToothImageDataset(Dataset):
             center_x = self.OUTPUT_CELL_SIZE * (float(x) + 0.5)
             center_y = self.OUTPUT_CELL_SIZE * (float(y) + 0.5)
 
-            width = self.anchor_dimensions[i][0] * self.RECEPTIVE_FIELD
-            height = self.anchor_dimensions[i][1] * self.RECEPTIVE_FIELD
+            width = self.anchor_dimensions[i][0] * self.ANCHOR_STANDARD_SIZE
+            height = self.anchor_dimensions[i][1] * self.ANCHOR_STANDARD_SIZE
 
             top_x = center_x - width / 2.0
             top_y = center_y - height / 2.0
@@ -220,8 +218,17 @@ class ToothImageDataset(Dataset):
         for bbox in bboxes:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
 
-        positives, negatives, truth_bbox = self.get_positive_negative_anchors(self.get_image_anchors(), bboxes)
-        for bbox in positives:
+        anchors = self.get_image_anchors()
+        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
+        for bbox in anchors[np.where(positives)]:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
 
         im.show()
+
+    def count_positive_anchors_on_image(self, i):
+        bboxes = self.get_truth_bboxes(i)
+        print(bboxes.shape)
+        anchors = self.get_image_anchors()
+        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
+        print(anchors[np.where(positives)])
+        return
