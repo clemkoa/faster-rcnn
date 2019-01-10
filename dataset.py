@@ -9,7 +9,8 @@ from skimage.transform import resize
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from PIL import Image, ImageDraw
-from utils import *
+
+from utils import nms, get_label_map_from_pbtxt, get_inverse_label_map_from_pbtxt, IoU
 
 class ToothImageDataset(Dataset):
     """Dataset of dental panoramic x-rays"""
@@ -200,6 +201,10 @@ class ToothImageDataset(Dataset):
 
         cls[cls <= 0.5] = 0.0
         cls = np.argmax(cls, axis=1)
+        for bbox in bboxes[np.where(cls == 1)]:
+            draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'red')
+
+        bboxes, cls = nms(bboxes, cls, 0.3)
 
         for bbox in bboxes[np.where(cls == 1)]:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')

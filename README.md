@@ -2,8 +2,6 @@
 
 https://arxiv.org/abs/1506.01497
 
-## Roadmap
-- ✅ RPN structure
-- ✅ Simple RPN working
-- 📦 Optimized RPN working
+
+- ✅ RPN working
 - 📦 Classification network shared with RPN

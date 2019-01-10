@@ -1,5 +1,6 @@
 import re
 import numpy as np
+import torch
 
 def IoU(anchor, bbox):
     (x1, y1, x2, y2) = anchor
@@ -31,13 +32,12 @@ def get_inverse_label_map_from_pbtxt(file):
     return result
 
 
-def nms(dets, thresh):
-    dets = dets.numpy()
+def nms(dets, cls, thresh):
     x1 = dets[:, 0]
     y1 = dets[:, 1]
     x2 = dets[:, 2]
     y2 = dets[:, 3]
-    scores = dets[:, 4]
+    scores = cls
 
     areas = (x2 - x1 + 1) * (y2 - y1 + 1)
     order = scores.argsort()[::-1]
@@ -59,4 +59,4 @@ def nms(dets, thresh):
         inds = np.where(ovr <= thresh)[0]
         order = order[inds + 1]
 
-    return torch.IntTensor(keep)
+    return dets[keep], cls[keep]

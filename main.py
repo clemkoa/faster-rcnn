@@ -58,5 +58,5 @@ def infer():
         cls, reg = rpn(im.float())
         dataset.visualise_proposals_on_image(reg.detach().numpy(), cls.detach().numpy(), i)
 
-# infer()
-train()
+infer()
+# train()
