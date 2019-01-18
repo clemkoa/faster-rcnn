@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torchvision.models as models
 
 class RPN(nn.Module):
-    def __init__(self, model='resnet50'):
+    def __init__(self, model='resnet50', path='resnet50.pt'):
         super(RPN, self).__init__()
 
         if model == 'resnet50':
@@ -26,6 +26,9 @@ class RPN(nn.Module):
         self.cls_layer = nn.Conv2d(512, 2* self.anchor_number, 1, 1, 0)
         # reg_layer
         self.reg_layer = nn.Conv2d(512, 4 * self.anchor_number, 1, 1, 0)
+
+        if os.path.isfile(path):
+            self.load_state_dict(torch.load(path))
 
     def forward(self, x):
         rpn_conv = F.relu(self.RPN_conv(self.feature_map(x)))

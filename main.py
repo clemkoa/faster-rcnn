@@ -1,25 +1,23 @@
+import argparse
 import os
 import sys
 import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
 from dataset import ToothImageDataset
 from rpn import RPN
+
+model = 'resnet50'
+MODEL_PATH = f'{model}.pt'
 
 def train():
     save_range = 20
     lamb = 10.0
-    model = 'resnet50'
-    MODEL_PATH = f'{model}.pt'
-    rpn = RPN(model=model)
-    if os.path.isfile(MODEL_PATH):
-        rpn.load_state_dict(torch.load(MODEL_PATH))
-    optimizer = optim.Adagrad(rpn.parameters(), lr = 0.0001)
 
+    rpn = RPN(model=model, path=MODEL_PATH)
+    optimizer = optim.Adagrad(rpn.parameters(), lr = 0.0001)
     dataset = ToothImageDataset('data')
 
     for i in range(1, len(dataset)):
@@ -45,11 +43,7 @@ def train():
     print('Finished Training')
 
 def infer():
-    model = 'resnet50'
-    MODEL_PATH = f'{model}.pt'
-    rpn = RPN(model=model)
-    rpn.load_state_dict(torch.load(MODEL_PATH))
-
+    rpn = RPN(model=model, path=MODEL_PATH)
     dataset = ToothImageDataset('data')
 
     for i in range(1, len(dataset)):
@@ -58,5 +52,17 @@ def infer():
         cls, reg = rpn(im.float())
         dataset.visualise_proposals_on_image(reg.detach().numpy(), cls.detach().numpy(), i)
 
-infer()
-# train()
+
+def main(args):
+    if args.infer:
+        infer()
+    if args.train:
+        train()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--train', action='store_true')
+    parser.add_argument('-i', '--infer', action='store_true')
+    args = parser.parse_args()
+
+    main(args)

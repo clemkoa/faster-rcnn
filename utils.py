@@ -60,3 +60,33 @@ def nms(dets, cls, thresh):
         order = order[inds + 1]
 
     return dets[keep], cls[keep]
+
+def parametrize(anchors, bboxes):
+    reg = np.zeros(anchors.shape, dtype=np.float32)
+    if not len(bboxes):
+        return reg
+
+    reg[:, :, :, 0] = (bboxes[:, :, :, 0] - anchors[:, :, :, 0]) / (anchors[:, :, :, 2] - anchors[:, :, :, 0])
+    reg[:, :, :, 1] = (bboxes[:, :, :, 1] - anchors[:, :, :, 1]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1])
+    reg[:, :, :, 2] = np.log((bboxes[:, :, :, 2] - bboxes[:, :, :, 0]) / (anchors[:, :, :, 2] - anchors[:, :, :, 0]) )
+    reg[:, :, :, 3] = np.log((bboxes[:, :, :, 3] - bboxes[:, :, :, 1]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1]) )
+
+    return np.nan_to_num(reg)
+
+def unparametrize(anchors, reg):
+    reg = reg.reshape(anchors.shape)
+    bboxes = np.zeros(anchors.shape, dtype=np.float32)
+
+    bboxes[:, :, :, 0] = (anchors[:, :, :, 2] - anchors[:, :, :, 0]) * reg[:, :, :, 0] + anchors[:, :, :, 0]
+    bboxes[:, :, :, 1] = (anchors[:, :, :, 3] - anchors[:, :, :, 1]) * reg[:, :, :, 1] + anchors[:, :, :, 1]
+    bboxes[:, :, :, 2] = (anchors[:, :, :, 2] - anchors[:, :, :, 0]) * np.exp(reg[:, :, :, 2]) + bboxes[:, :, :, 0]
+    bboxes[:, :, :, 3] = (anchors[:, :, :, 3] - anchors[:, :, :, 1]) * np.exp(reg[:, :, :, 3]) + bboxes[:, :, :, 1]
+
+    return bboxes
+
+def count_positive_anchors_on_image(i, dataset):
+    bboxes = dataset.get_truth_bboxes(i)
+    anchors = dataset.get_image_anchors()
+    truth_bbox, positives, negatives = dataset.get_positive_negative_anchors(anchors, bboxes)
+    print(anchors[np.where(positives)])
+    return len(np.where(positives))

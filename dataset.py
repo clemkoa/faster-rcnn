@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from PIL import Image, ImageDraw
 
-from utils import nms, get_label_map_from_pbtxt, get_inverse_label_map_from_pbtxt, IoU
+from utils import nms, get_label_map_from_pbtxt, get_inverse_label_map_from_pbtxt, IoU, parametrize, unparametrize
 
 class ToothImageDataset(Dataset):
     """Dataset of dental panoramic x-rays"""
@@ -56,7 +56,7 @@ class ToothImageDataset(Dataset):
         anchors = self.get_image_anchors()
         im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
         truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
-        reg_target = self.parametrize(anchors, truth_bbox)
+        reg_target = parametrize(anchors, truth_bbox)
 
         indices = np.array([i for i in range(len(anchors.reshape((-1, 4))))])
         selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
@@ -83,9 +83,6 @@ class ToothImageDataset(Dataset):
         return selected_indices, positive_indices
 
     def get_anchors_at_position(self, pos):
-        """
-        position (x, y)
-        """
         # dimensions of an anchor: (self.anchor_number, 4)
         # each anchor is [x, y, w, h]
         x, y = pos
@@ -117,7 +114,7 @@ class ToothImageDataset(Dataset):
         tree = ET.parse(path)
         root = tree.getroot()
 
-        # we need to resize the bboxes according to the INPUT_SIZE
+        # we need to resize the bboxes to the INPUT_SIZE
         size = root.find('size')
         height = int(size.find('height').text)
         width = int(size.find('width').text)
@@ -126,7 +123,7 @@ class ToothImageDataset(Dataset):
 
         raw_boxes = [child for child in root if child.tag == 'object']
         classes = [self.inverse_label_map[c[0].text] for c in raw_boxes]
-        # TODO be sure that the order is always the same (xmin, ymin, xmax, ymax)
+
         bboxes = np.array([[[int(d.text) for d in c] for c in object if c.tag == 'bndbox'] for object in raw_boxes])
         if not len(bboxes):
             return np.array([])
@@ -165,39 +162,20 @@ class ToothImageDataset(Dataset):
     def get_inverse_label_map(self, label_map_path):
         return get_inverse_label_map_from_pbtxt(label_map_path)
 
-    def parametrize(self, anchors, bboxes):
-        reg = np.zeros(anchors.shape, dtype = np.float32)
-        if not len(bboxes):
-            return reg
-
-        reg[:, :, :, 0] = (bboxes[:, :, :, 0] - anchors[:, :, :, 0]) / (anchors[:, :, :, 2] - anchors[:, :, :, 0])
-        reg[:, :, :, 1] = (bboxes[:, :, :, 1] - anchors[:, :, :, 1]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1])
-        reg[:, :, :, 2] = np.log((bboxes[:, :, :, 2] - bboxes[:, :, :, 0]) / (anchors[:, :, :, 2] - anchors[:, :, :, 0]) )
-        reg[:, :, :, 3] = np.log((bboxes[:, :, :, 3] - bboxes[:, :, :, 1]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1]) )
-
-        return np.nan_to_num(reg)
-
-    def unparametrize(self, anchors, reg):
-        reg = reg.reshape(anchors.shape)
-        bboxes = np.zeros(anchors.shape, dtype = np.float32)
-
-        bboxes[:, :, :, 0] = (anchors[:, :, :, 2] - anchors[:, :, :, 0]) * reg[:, :, :, 0] + anchors[:, :, :, 0]
-        bboxes[:, :, :, 1] = (anchors[:, :, :, 3] - anchors[:, :, :, 1]) * reg[:, :, :, 1] + anchors[:, :, :, 1]
-        bboxes[:, :, :, 2] = (anchors[:, :, :, 2] - anchors[:, :, :, 0]) * np.exp(reg[:, :, :, 2]) + bboxes[:, :, :, 0]
-        bboxes[:, :, :, 3] = (anchors[:, :, :, 3] - anchors[:, :, :, 1]) * np.exp(reg[:, :, :, 3]) + bboxes[:, :, :, 1]
-
-        return bboxes
-
-    def visualise_proposals_on_image(self, reg, cls, i):
+    def get_resized_image(self, i):
         image = self.get_image(i)
         temp_im = Image.fromarray(image).resize(self.INPUT_SIZE)
         im = Image.new("RGBA", temp_im.size)
         im.paste(temp_im)
+        return im
+
+    def visualise_proposals_on_image(self, reg, cls, i):
+        im = self.get_resized_image(i)
 
         draw = ImageDraw.Draw(im)
 
         anchors = self.get_image_anchors()
-        bboxes = self.unparametrize(anchors, reg).reshape((-1, 4))
+        bboxes = unparametrize(anchors, reg).reshape((-1, 4))
 
         cls[cls <= 0.5] = 0.0
         cls = np.argmax(cls, axis=1)
@@ -212,10 +190,7 @@ class ToothImageDataset(Dataset):
         im.show()
 
     def visualise_anchors_on_image(self, i):
-        image = self.get_image(i)
-        temp_im = Image.fromarray(image).resize(self.INPUT_SIZE)
-        im = Image.new("RGBA", temp_im.size)
-        im.paste(temp_im)
+        im = self.get_resized_image(i)
 
         draw = ImageDraw.Draw(im)
 
@@ -229,11 +204,3 @@ class ToothImageDataset(Dataset):
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
 
         im.show()
-
-    def count_positive_anchors_on_image(self, i):
-        bboxes = self.get_truth_bboxes(i)
-        print(bboxes.shape)
-        anchors = self.get_image_anchors()
-        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
-        print(anchors[np.where(positives)])
-        return
