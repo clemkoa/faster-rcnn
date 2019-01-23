@@ -12,13 +12,12 @@ from rpn import RPN
 model = 'resnet50'
 MODEL_PATH = f'{model}.pt'
 
-def train():
+def train(dataset):
     save_range = 20
     lamb = 10.0
 
     rpn = RPN(model=model, path=MODEL_PATH)
     optimizer = optim.Adagrad(rpn.parameters(), lr = 0.0001)
-    dataset = ToothImageDataset('data')
 
     for i in range(1, len(dataset)):
         im, reg_truth, cls_truth, selected_indices, positives = dataset[i]
@@ -42,22 +41,23 @@ def train():
             torch.save(rpn.state_dict(), MODEL_PATH)
     print('Finished Training')
 
-def infer():
-    rpn = RPN(model=model, path=MODEL_PATH)
-    dataset = ToothImageDataset('data')
+def infer(dataset):
+    with torch.no_grad():
+        rpn = RPN(model=model, path=MODEL_PATH)
 
-    for i in range(1, len(dataset)):
-        im, reg_truth, cls_truth, selected_indices, positives = dataset[i]
+        for i in range(1, len(dataset)):
+            im, reg_truth, cls_truth, selected_indices, positives = dataset[i]
 
-        cls, reg = rpn(im.float())
-        dataset.visualise_proposals_on_image(reg.detach().numpy(), cls.detach().numpy(), i)
+            cls, reg = rpn(im.float())
+            dataset.visualise_proposals_on_image(reg.detach().numpy(), cls.detach().numpy(), i)
 
 
 def main(args):
+    dataset = ToothImageDataset('data')
     if args.infer:
-        infer()
+        infer(dataset)
     if args.train:
-        train()
+        train(dataset)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
