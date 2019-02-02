@@ -54,14 +54,18 @@ class ToothImageDataset(Dataset):
         image = self.get_image(i)
         bboxes = self.get_truth_bboxes(i)
         anchors = self.get_image_anchors()
+        # image input is grayscale, convert to rgb
         im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
         truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
         reg_target = parametrize(anchors, truth_bbox)
 
         indices = np.array([i for i in range(len(anchors.reshape((-1, 4))))])
         selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
-        # F.cross_entropy does not take a one-hot vector as target, but a class index vector
-        return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(positives.astype(int).reshape((-1, 2))), selected_indices, positive_indices
+
+        n = self.NUMBER_ANCHORS_WIDE * self.NUMBER_ANCHORS_HEIGHT * self.anchor_number
+        cls_truth = np.zeros((n, 2))
+        cls_truth[np.arange(n), positives.reshape(n).astype(int)] = 1.0
+        return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(cls_truth.astype(int)), selected_indices, positive_indices
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -83,8 +87,8 @@ class ToothImageDataset(Dataset):
         return selected_indices, positive_indices
 
     def get_anchors_at_position(self, pos):
-        # dimensions of an anchor: (self.anchor_number, 4)
-        # each anchor is [x, y, w, h]
+        # dimensions of anchors: (self.anchor_number, 4)
+        # each anchor is [xa, ya, xb, yb]
         x, y = pos
         anchors = np.zeros((self.anchor_number, 4))
         for i in range(self.anchor_number):
@@ -122,8 +126,6 @@ class ToothImageDataset(Dataset):
         height_ratio = float(height) / float(self.INPUT_SIZE[1])
 
         raw_boxes = [child for child in root if child.tag == 'object']
-        classes = [self.inverse_label_map[c[0].text] for c in raw_boxes]
-
         bboxes = np.array([[[int(d.text) for d in c] for c in object if c.tag == 'bndbox'] for object in raw_boxes])
         if not len(bboxes):
             return np.array([])
@@ -137,15 +139,15 @@ class ToothImageDataset(Dataset):
 
     def get_positive_negative_anchors(self, anchors, bboxes):
         if not len(bboxes):
-            ious = np.zeros((self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number))
+            ious = np.zeros(anchors.shape[:3])
             positives = ious > self.POSITIVE_THRESHOLD
             negatives = ious < self.NEGATIVE_THRESHOLD
             return np.array([]), positives, negatives
 
-        ious = np.zeros((self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number, len(bboxes)))
-        for i in range(anchors.shape[0]):
-            for j in range(anchors.shape[1]):
-                for n in range(anchors.shape[2]):
+        ious = np.zeros(anchors.shape[:3] + (len(bboxes),))
+        for i in range(ious.shape[0]):
+            for j in range(ious.shape[1]):
+                for n in range(ious.shape[2]):
                     for b in range(len(bboxes)):
                         ious[i, j, n, b] = IoU(anchors[i, j, n], bboxes[b])
         arg_truth_bbox = np.argmax(ious, axis=3).flatten()
@@ -165,7 +167,7 @@ class ToothImageDataset(Dataset):
     def get_resized_image(self, i):
         image = self.get_image(i)
         temp_im = Image.fromarray(image).resize(self.INPUT_SIZE)
-        im = Image.new("RGBA", temp_im.size)
+        im = Image.new('RGB', temp_im.size)
         im.paste(temp_im)
         return im
 
@@ -177,10 +179,10 @@ class ToothImageDataset(Dataset):
         anchors = self.get_image_anchors()
         bboxes = unparametrize(anchors, reg).reshape((-1, 4))
 
-        cls[cls <= 0.5] = 0.0
+        cls[cls <= 0.8] = 0.0
         cls = np.argmax(cls, axis=1)
-        for bbox in bboxes[np.where(cls == 1)]:
-            draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'red')
+        # for bbox in bboxes[np.where(cls == 1)]:
+        #     draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'red')
 
         bboxes, cls = nms(bboxes, cls, 0.3)
 
