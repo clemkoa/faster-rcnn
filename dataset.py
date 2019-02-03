@@ -4,6 +4,8 @@ import torch
 import re
 import xml.etree.ElementTree as ET
 import numpy as np
+import cv2
+from PIL import Image
 from skimage import io
 from skimage.transform import resize
 from torch.utils.data import Dataset, DataLoader
@@ -76,7 +78,13 @@ class ToothImageDataset(Dataset):
 
     def get_image(self, i):
         path = os.path.join(self.root_dir, 'JPEGImages', str(i) + '.png')
-        return io.imread(path)
+        img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        return self.preprocess_image(img)
+
+    def preprocess_image(self, img):
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(16,16))
+        cl = clahe.apply(img)
+        return cl
 
     def get_selected_indices_sample(self, indices, positives, negatives):
         positive_indices = indices[positives.reshape(-1)]
@@ -179,12 +187,12 @@ class ToothImageDataset(Dataset):
         anchors = self.get_image_anchors()
         bboxes = unparametrize(anchors, reg).reshape((-1, 4))
 
-        cls[cls <= 0.8] = 0.0
+        cls[cls <= 0.85] = 0.0
         cls = np.argmax(cls, axis=1)
         # for bbox in bboxes[np.where(cls == 1)]:
         #     draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'red')
 
-        bboxes, cls = nms(bboxes, cls, 0.3)
+        bboxes, cls = nms(bboxes, cls, 0.6)
 
         for bbox in bboxes[np.where(cls == 1)]:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
