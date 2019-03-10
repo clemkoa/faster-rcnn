@@ -14,6 +14,14 @@ from PIL import Image, ImageDraw
 
 from utils import nms, get_label_map_from_pbtxt, get_inverse_label_map_from_pbtxt, IoU, parametrize, unparametrize
 
+def softmax(z):
+    s = np.max(z, axis=1)
+    s = s[:, np.newaxis] # necessary step to do broadcasting
+    e_x = np.exp(z - s)
+    div = np.sum(e_x, axis=1)
+    div = div[:, np.newaxis] # dito
+    return e_x / div
+
 class ToothImageDataset(Dataset):
     """Dataset of dental panoramic x-rays"""
 
@@ -67,7 +75,7 @@ class ToothImageDataset(Dataset):
         n = self.NUMBER_ANCHORS_WIDE * self.NUMBER_ANCHORS_HEIGHT * self.anchor_number
         cls_truth = np.zeros((n, 2))
         cls_truth[np.arange(n), positives.reshape(n).astype(int)] = 1.0
-        return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(cls_truth.astype(int)), selected_indices, positive_indices
+        return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(cls_truth), selected_indices, positive_indices
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -186,8 +194,10 @@ class ToothImageDataset(Dataset):
 
         anchors = self.get_image_anchors()
         bboxes = unparametrize(anchors, reg).reshape((-1, 4))
-
-        cls[cls <= 0.85] = 0.0
+        print(cls)
+        cls = softmax(cls)
+        print(cls)
+        cls[cls <= 0.] = 0.0
         cls = np.argmax(cls, axis=1)
         # for bbox in bboxes[np.where(cls == 1)]:
         #     draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'red')

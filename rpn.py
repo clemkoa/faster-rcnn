@@ -21,20 +21,23 @@ class RPN(nn.Module):
 
         self.anchor_number = 9
 
-        self.RPN_conv = nn.Conv2d(self.in_dim, 512, 3, 1, 1, bias=True)
+        self.RPN_conv = nn.Conv2d(self.in_dim, 2048, 3, 1, 1)
         # cls layer
-        self.cls_layer = nn.Conv2d(512, 2* self.anchor_number, 1, 1, 0, bias=True)
+        self.cls_layer = nn.Conv2d(2048, 2* self.anchor_number, 1, 1, 0)
         # reg_layer
-        self.reg_layer = nn.Conv2d(512, 4 * self.anchor_number, 1, 1, 0, bias=True)
+        self.reg_layer = nn.Conv2d(2048, 4 * self.anchor_number, 1, 1, 0)
+        torch.nn.init.normal_(self.RPN_conv.weight, std=0.01)
+        torch.nn.init.normal_(self.cls_layer.weight, std=0.01)
+        torch.nn.init.normal_(self.reg_layer.weight, std=0.01)
 
         if os.path.isfile(path):
             self.load_state_dict(torch.load(path))
 
     def forward(self, x):
-        rpn_conv = F.relu(self.RPN_conv(self.feature_map(x)))
+        rpn_conv = F.relu(self.RPN_conv(self.feature_map(x)), inplace=True)
         cls_output = self.cls_layer(rpn_conv)
         reg_output = self.reg_layer(rpn_conv)
 
-        cls_output = F.softmax(cls_output.view(-1, 2))
+        cls_output = F.sigmoid(cls_output.view(-1, 2))
         reg_output = reg_output.view(-1, 4)
         return cls_output, reg_output
