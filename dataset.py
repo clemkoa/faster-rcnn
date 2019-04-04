@@ -29,11 +29,11 @@ class ToothImageDataset(Dataset):
     OUTPUT_SIZE = (50, 25)
     OUTPUT_CELL_SIZE = float(INPUT_SIZE[0]) / float(OUTPUT_SIZE[0])
 
-    ANCHOR_STANDARD_SIZE = 512
+    ANCHOR_STANDARD_SIZE = 32
 
     # anchors constants
-    ANCHORS_WIDTH_RATIOS = [0.1, 0.2, 0.3]
-    ANCHORS_HEIGHT_RATIOS = [0.1, 0.2, 0.3]
+    ANCHORS_RATIOS = [0.3, 0.5, 1.0]
+    ANCHORS_SCALES = [3, 4, 6]
 
     NUMBER_ANCHORS_WIDE = OUTPUT_SIZE[0]
     NUMBER_ANCHORS_HEIGHT = OUTPUT_SIZE[1]
@@ -79,9 +79,11 @@ class ToothImageDataset(Dataset):
 
     def get_anchor_dimensions(self):
         dimensions = []
-        for w in self.ANCHORS_WIDTH_RATIOS:
-            for h in self.ANCHORS_HEIGHT_RATIOS:
-                dimensions.append((w, h))
+        for r in self.ANCHORS_RATIOS:
+            for s in self.ANCHORS_SCALES:
+                width = s * np.sqrt(r)
+                height = s * np.sqrt(1.0/r)
+                dimensions.append((width, height))
         return dimensions
 
     def get_image(self, i):
