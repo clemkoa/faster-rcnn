@@ -33,7 +33,8 @@ class ToothImageDataset(Dataset):
 
     ANCHOR_SAMPLING_SIZE = 256
 
-    NMS_THRESHOLD = 0.7
+    NMS_THRESHOLD = 0.5
+    PRE_NMS_MAX_PROPOSALS = 6000
     POST_NMS_MAX_PROPOSALS = 100
 
     def __init__(self, root_dir):
@@ -188,21 +189,25 @@ class ToothImageDataset(Dataset):
         im.paste(temp_im)
         return im
 
-    def visualise_proposals_on_image(self, reg, cls, i):
-        im = self.get_resized_image(i)
-        draw = ImageDraw.Draw(im)
-
+    def get_proposals(self, reg, cls):
         objects = np.argmax(cls, axis=1)
 
         anchors = self.get_image_anchors()
         bboxes = unparametrize(anchors, reg).reshape((-1, 4))
 
-        cls = cls[np.where(objects == 1)]
-        bboxes = bboxes[np.where(objects == 1)]
+        cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
+        bboxes = bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
 
         keep = nms(bboxes, cls[:, 1].ravel(), self.NMS_THRESHOLD)
+        cls = cls[keep[:self.POST_NMS_MAX_PROPOSALS]]
+        return bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]
 
-        for bbox in bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]:
+    def visualise_proposals_on_image(self, reg, cls, i):
+        im = self.get_resized_image(i)
+        draw = ImageDraw.Draw(im)
+
+        bboxes = self.get_proposals(reg, cls)
+        for bbox in bboxes:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
 
         im.show()

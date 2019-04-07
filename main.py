@@ -46,13 +46,12 @@ def infer(dataset):
     with torch.no_grad():
         rpn = RPN(model=model, path=MODEL_PATH)
 
+        # TODO change hardcoded range for test dataset
         for i in range(1, len(dataset)):
             im, reg_truth, cls_truth, selected_indices, positives = dataset[i]
-            print(reg_truth.shape, cls_truth.shape, selected_indices.shape, positives.shape)
 
             cls, reg = rpn(im.float())
             dataset.visualise_proposals_on_image(reg.detach().numpy(), cls.detach().numpy(), i)
-            # dataset.visualise_sampling_on_image(i)
 
 def main(args):
     dataset = ToothImageDataset('data')
