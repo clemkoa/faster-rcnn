@@ -29,8 +29,6 @@ class ToothImageDataset(Dataset):
     OUTPUT_SIZE = (100, 50)
     OUTPUT_CELL_SIZE = float(INPUT_SIZE[0]) / float(OUTPUT_SIZE[0])
 
-    ANCHOR_STANDARD_SIZE = 16
-
     # anchors constants
     ANCHORS_RATIOS = [0.25, 0.5, 1.0]
     ANCHORS_SCALES = [3, 4, 5]
@@ -69,13 +67,13 @@ class ToothImageDataset(Dataset):
         truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
         reg_target = parametrize(anchors, truth_bbox)
 
-        indices = np.array([i for i in range(len(anchors.reshape((-1, 4))))])
+        n = len(anchors)
+        indices = np.array([i for i in range(n)])
         selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
 
-        n = self.NUMBER_ANCHORS_WIDE * self.NUMBER_ANCHORS_HEIGHT * self.anchor_number
         cls_truth = np.zeros((n, 2))
-        cls_truth[np.arange(n), positives.reshape(n).astype(int)] = 1.0
-        return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(cls_truth), selected_indices, positive_indices
+        cls_truth[np.arange(n), positives.astype(int)] = 1.0
+        return torch.from_numpy(im), torch.from_numpy(reg_target), torch.from_numpy(cls_truth), selected_indices, positive_indices
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -97,8 +95,8 @@ class ToothImageDataset(Dataset):
         return cl
 
     def get_selected_indices_sample(self, indices, positives, negatives):
-        positive_indices = indices[positives.reshape(-1)]
-        negative_indices = indices[negatives.reshape(-1)]
+        positive_indices = indices[positives]
+        negative_indices = indices[negatives]
         random_positives = np.random.permutation(positive_indices)[:self.ANCHOR_SAMPLING_SIZE // 2]
         random_negatives = np.random.permutation(negative_indices)[:self.ANCHOR_SAMPLING_SIZE - len(random_positives)]
         selected_indices = np.concatenate((random_positives, random_negatives))
@@ -113,8 +111,8 @@ class ToothImageDataset(Dataset):
             center_x = self.OUTPUT_CELL_SIZE * (float(x) + 0.5)
             center_y = self.OUTPUT_CELL_SIZE * (float(y) + 0.5)
 
-            width = self.anchor_dimensions[i][0] * self.ANCHOR_STANDARD_SIZE
-            height = self.anchor_dimensions[i][1] * self.ANCHOR_STANDARD_SIZE
+            width = self.anchor_dimensions[i][0] * self.OUTPUT_CELL_SIZE
+            height = self.anchor_dimensions[i][1] * self.OUTPUT_CELL_SIZE
 
             top_x = center_x - width / 2.0
             top_y = center_y - height / 2.0
@@ -129,7 +127,7 @@ class ToothImageDataset(Dataset):
                 anchors_pos = self.get_anchors_at_position((i, j))
                 anchors[i, j, :] = anchors_pos
 
-        return anchors
+        return anchors.reshape((-1, 4))
 
     def get_truth_bboxes(self, i):
         path = os.path.join(self.root_dir, 'Annotations', str(i) + '.xml')
@@ -161,7 +159,7 @@ class ToothImageDataset(Dataset):
             positives = ious > self.POSITIVE_THRESHOLD
             negatives = ious < self.NEGATIVE_THRESHOLD
             return np.array([]), positives, negatives
-        anchors = anchors.reshape((-1, 4))
+
         ious = np.zeros((anchors.shape[0], len(bboxes)))
 
         # TODO improve speed with a real numpy formula
