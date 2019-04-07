@@ -22,8 +22,8 @@ class ToothImageDataset(Dataset):
     OUTPUT_CELL_SIZE = float(INPUT_SIZE[0]) / float(OUTPUT_SIZE[0])
 
     # anchors constants
-    ANCHORS_RATIOS = [0.25, 0.5, 1.0]
-    ANCHORS_SCALES = [3, 4, 5]
+    ANCHORS_RATIOS = [0.25, 0.5, 0.9]
+    ANCHORS_SCALES = [4, 6, 8]
 
     NUMBER_ANCHORS_WIDE = OUTPUT_SIZE[0]
     NUMBER_ANCHORS_HEIGHT = OUTPUT_SIZE[1]
