@@ -161,18 +161,24 @@ class ToothImageDataset(Dataset):
             positives = ious > self.POSITIVE_THRESHOLD
             negatives = ious < self.NEGATIVE_THRESHOLD
             return np.array([]), positives, negatives
+        anchors = anchors.reshape((-1, 4))
+        ious = np.zeros((anchors.shape[0], len(bboxes)))
 
-        ious = np.zeros(anchors.shape[:3] + (len(bboxes),))
+        # TODO improve speed with a real numpy formula
         for i in range(ious.shape[0]):
             for j in range(ious.shape[1]):
-                for n in range(ious.shape[2]):
-                    for b in range(len(bboxes)):
-                        ious[i, j, n, b] = IoU(anchors[i, j, n], bboxes[b])
-        arg_truth_bbox = np.argmax(ious, axis=3).flatten()
-        truth_bbox = bboxes[arg_truth_bbox, :].reshape(ious.shape[:3] + (bboxes.shape[-1],))
+                ious[i, j] = IoU(anchors[i], bboxes[j])
+        best_bbox_for_anchor = np.argmax(ious, axis=1)
+        best_anchor_for_bbox = np.argmax(ious, axis=0)
+        max_iou_per_anchor = np.amax(ious, axis=1)
 
-        max_iou_per_anchor = np.amax(ious, axis=3)
+        # truth box for each anchor
+        truth_bbox = bboxes[best_bbox_for_anchor, :]
+
+        # Selecting all ious > POSITIVE_THRESHOLD
         positives = max_iou_per_anchor > self.POSITIVE_THRESHOLD
+        # Adding max iou for each ground truth box
+        positives[best_anchor_for_bbox] = True
         negatives = max_iou_per_anchor < self.NEGATIVE_THRESHOLD
         return truth_bbox, positives, negatives
 
