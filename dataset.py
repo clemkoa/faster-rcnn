@@ -226,7 +226,28 @@ class ToothImageDataset(Dataset):
 
         anchors = self.get_image_anchors()
         truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
+        print(len(np.where(positives)[0]))
         for bbox in anchors[np.where(positives)]:
+            draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
+
+        # for bbox in anchors[10, 10, :, :]:
+        #     draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
+
+        im.show()
+
+
+    def visualise_sampling_on_image(self, i):
+        im = self.get_resized_image(i)
+        draw = ImageDraw.Draw(im)
+
+        image = self.get_image(i)
+        bboxes = self.get_truth_bboxes(i)
+        anchors = self.get_image_anchors()
+        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
+        indices = np.array([i for i in range(len(anchors))])
+        selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
+
+        for bbox in anchors[selected_indices]:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
 
         im.show()

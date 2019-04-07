@@ -35,9 +35,10 @@ class RPN(nn.Module):
 
     def forward(self, x):
         rpn_conv = F.relu(self.RPN_conv(self.feature_map(x)), inplace=True)
-        cls_output = self.cls_layer(rpn_conv)
-        reg_output = self.reg_layer(rpn_conv)
+        # permute dimensions
+        cls_output = self.cls_layer(rpn_conv).permute(0, 2, 3, 1).contiguous().view(1, -1, 2)
+        reg_output = self.reg_layer(rpn_conv).permute(0, 2, 3, 1).contiguous().view(1, -1, 4)
 
-        cls_output = F.sigmoid(cls_output.view(-1, 2))
+        cls_output = F.softmax(cls_output.view(-1, 2), dim=1)
         reg_output = reg_output.view(-1, 4)
         return cls_output, reg_output
