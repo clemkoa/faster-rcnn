@@ -26,20 +26,20 @@ class ToothImageDataset(Dataset):
     """Dataset of dental panoramic x-rays"""
 
     INPUT_SIZE = (1600, 800)
-    OUTPUT_SIZE = (50, 25)
+    OUTPUT_SIZE = (100, 50)
     OUTPUT_CELL_SIZE = float(INPUT_SIZE[0]) / float(OUTPUT_SIZE[0])
 
-    ANCHOR_STANDARD_SIZE = 32
+    ANCHOR_STANDARD_SIZE = 16
 
     # anchors constants
-    ANCHORS_RATIOS = [0.3, 0.5, 1.0]
-    ANCHORS_SCALES = [3, 4, 6]
+    ANCHORS_RATIOS = [0.25, 0.5, 1.0]
+    ANCHORS_SCALES = [3, 4, 5]
 
     NUMBER_ANCHORS_WIDE = OUTPUT_SIZE[0]
     NUMBER_ANCHORS_HEIGHT = OUTPUT_SIZE[1]
 
     NEGATIVE_THRESHOLD = 0.3
-    POSITIVE_THRESHOLD = 0.5
+    POSITIVE_THRESHOLD = 0.7
 
     ANCHOR_SAMPLING_SIZE = 256
 
