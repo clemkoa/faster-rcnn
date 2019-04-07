@@ -66,10 +66,10 @@ def parametrize(anchors, bboxes):
     if not len(bboxes):
         return reg
 
-    reg[:, :, :, 0] = 0.5 * (bboxes[:, :, :, 0] + bboxes[:, :, :, 2] - anchors[:, :, :, 0] - anchors[:, :, :, 2]) / (anchors[:, :, :, 2] - anchors[:, :, :, 0])
-    reg[:, :, :, 1] = 0.5 * (bboxes[:, :, :, 1] + bboxes[:, :, :, 3] - anchors[:, :, :, 1] - anchors[:, :, :, 3]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1])
-    reg[:, :, :, 2] = np.log((bboxes[:, :, :, 2] - bboxes[:, :, :, 0]) / (anchors[:, :, :, 2] - anchors[:, :, :, 0]) )
-    reg[:, :, :, 3] = np.log((bboxes[:, :, :, 3] - bboxes[:, :, :, 1]) / (anchors[:, :, :, 3] - anchors[:, :, :, 1]) )
+    reg[:, 0] = 0.5 * (bboxes[:, 0] + bboxes[:, 2] - anchors[:, 0] - anchors[:, 2]) / (anchors[:, 2] - anchors[:, 0])
+    reg[:, 1] = 0.5 * (bboxes[:, 1] + bboxes[:, 3] - anchors[:, 1] - anchors[:, 3]) / (anchors[:, 3] - anchors[:, 1])
+    reg[:, 2] = np.log((bboxes[:, 2] - bboxes[:, 0]) / (anchors[:, 2] - anchors[:, 0]) )
+    reg[:, 3] = np.log((bboxes[:, 3] - bboxes[:, 1]) / (anchors[:, 3] - anchors[:, 1]) )
     # print(reg)
     return reg
 
@@ -77,15 +77,15 @@ def unparametrize(anchors, reg):
     reg = reg.reshape(anchors.shape)
     bboxes = np.zeros(anchors.shape, dtype=np.float32)
 
-    bboxes[:, :, :, 0] = (anchors[:, :, :, 2] - anchors[:, :, :, 0]) * reg[:, :, :, 0] + (anchors[:, :, :, 0] + anchors[:, :, :, 2]) / 2.0
-    bboxes[:, :, :, 1] = (anchors[:, :, :, 3] - anchors[:, :, :, 1]) * reg[:, :, :, 1] + (anchors[:, :, :, 1] + anchors[:, :, :, 3]) / 2.0
-    bboxes[:, :, :, 2] = (anchors[:, :, :, 2] - anchors[:, :, :, 0]) * np.exp(reg[:, :, :, 2])
-    bboxes[:, :, :, 3] = (anchors[:, :, :, 3] - anchors[:, :, :, 1]) * np.exp(reg[:, :, :, 3])
+    bboxes[:, 0] = (anchors[:, 2] - anchors[:, 0]) * reg[:, 0] + (anchors[:, 0] + anchors[:, 2]) / 2.0
+    bboxes[:, 1] = (anchors[:, 3] - anchors[:, 1]) * reg[:, 1] + (anchors[:, 1] + anchors[:, 3]) / 2.0
+    bboxes[:, 2] = (anchors[:, 2] - anchors[:, 0]) * np.exp(reg[:, 2])
+    bboxes[:, 3] = (anchors[:, 3] - anchors[:, 1]) * np.exp(reg[:, 3])
 
-    bboxes[:, :, :, 0] = bboxes[:, :, :, 0] - bboxes[:, :, :, 2] / 2.0
-    bboxes[:, :, :, 1] = bboxes[:, :, :, 1] - bboxes[:, :, :, 3] / 2.0
-    bboxes[:, :, :, 2] = bboxes[:, :, :, 0] + bboxes[:, :, :, 2]
-    bboxes[:, :, :, 3] = bboxes[:, :, :, 1] + bboxes[:, :, :, 3]
+    bboxes[:, 0] = bboxes[:, 0] - bboxes[:, 2] / 2.0
+    bboxes[:, 1] = bboxes[:, 1] - bboxes[:, 3] / 2.0
+    bboxes[:, 2] = bboxes[:, 0] + bboxes[:, 2]
+    bboxes[:, 3] = bboxes[:, 1] + bboxes[:, 3]
 
     return bboxes
 

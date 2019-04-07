@@ -26,20 +26,18 @@ class ToothImageDataset(Dataset):
     """Dataset of dental panoramic x-rays"""
 
     INPUT_SIZE = (1600, 800)
-    OUTPUT_SIZE = (50, 25)
+    OUTPUT_SIZE = (100, 50)
     OUTPUT_CELL_SIZE = float(INPUT_SIZE[0]) / float(OUTPUT_SIZE[0])
 
-    ANCHOR_STANDARD_SIZE = 32
-
     # anchors constants
-    ANCHORS_RATIOS = [0.3, 0.5, 1.0]
-    ANCHORS_SCALES = [3, 4, 6]
+    ANCHORS_RATIOS = [0.25, 0.5, 1.0]
+    ANCHORS_SCALES = [3, 4, 5]
 
     NUMBER_ANCHORS_WIDE = OUTPUT_SIZE[0]
     NUMBER_ANCHORS_HEIGHT = OUTPUT_SIZE[1]
 
     NEGATIVE_THRESHOLD = 0.3
-    POSITIVE_THRESHOLD = 0.5
+    POSITIVE_THRESHOLD = 0.7
 
     ANCHOR_SAMPLING_SIZE = 256
 
@@ -69,13 +67,13 @@ class ToothImageDataset(Dataset):
         truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
         reg_target = parametrize(anchors, truth_bbox)
 
-        indices = np.array([i for i in range(len(anchors.reshape((-1, 4))))])
+        n = len(anchors)
+        indices = np.array([i for i in range(n)])
         selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
 
-        n = self.NUMBER_ANCHORS_WIDE * self.NUMBER_ANCHORS_HEIGHT * self.anchor_number
         cls_truth = np.zeros((n, 2))
-        cls_truth[np.arange(n), positives.reshape(n).astype(int)] = 1.0
-        return torch.from_numpy(im), torch.from_numpy(reg_target.reshape((-1, 4))), torch.from_numpy(cls_truth), selected_indices, positive_indices
+        cls_truth[np.arange(n), positives.astype(int)] = 1.0
+        return torch.from_numpy(im), torch.from_numpy(reg_target), torch.from_numpy(cls_truth), selected_indices, positive_indices
 
     def get_anchor_dimensions(self):
         dimensions = []
@@ -97,8 +95,8 @@ class ToothImageDataset(Dataset):
         return cl
 
     def get_selected_indices_sample(self, indices, positives, negatives):
-        positive_indices = indices[positives.reshape(-1)]
-        negative_indices = indices[negatives.reshape(-1)]
+        positive_indices = indices[positives]
+        negative_indices = indices[negatives]
         random_positives = np.random.permutation(positive_indices)[:self.ANCHOR_SAMPLING_SIZE // 2]
         random_negatives = np.random.permutation(negative_indices)[:self.ANCHOR_SAMPLING_SIZE - len(random_positives)]
         selected_indices = np.concatenate((random_positives, random_negatives))
@@ -113,8 +111,8 @@ class ToothImageDataset(Dataset):
             center_x = self.OUTPUT_CELL_SIZE * (float(x) + 0.5)
             center_y = self.OUTPUT_CELL_SIZE * (float(y) + 0.5)
 
-            width = self.anchor_dimensions[i][0] * self.ANCHOR_STANDARD_SIZE
-            height = self.anchor_dimensions[i][1] * self.ANCHOR_STANDARD_SIZE
+            width = self.anchor_dimensions[i][0] * self.OUTPUT_CELL_SIZE
+            height = self.anchor_dimensions[i][1] * self.OUTPUT_CELL_SIZE
 
             top_x = center_x - width / 2.0
             top_y = center_y - height / 2.0
@@ -129,7 +127,7 @@ class ToothImageDataset(Dataset):
                 anchors_pos = self.get_anchors_at_position((i, j))
                 anchors[i, j, :] = anchors_pos
 
-        return anchors
+        return anchors.reshape((-1, 4))
 
     def get_truth_bboxes(self, i):
         path = os.path.join(self.root_dir, 'Annotations', str(i) + '.xml')
@@ -162,17 +160,23 @@ class ToothImageDataset(Dataset):
             negatives = ious < self.NEGATIVE_THRESHOLD
             return np.array([]), positives, negatives
 
-        ious = np.zeros(anchors.shape[:3] + (len(bboxes),))
+        ious = np.zeros((anchors.shape[0], len(bboxes)))
+
+        # TODO improve speed with a real numpy formula
         for i in range(ious.shape[0]):
             for j in range(ious.shape[1]):
-                for n in range(ious.shape[2]):
-                    for b in range(len(bboxes)):
-                        ious[i, j, n, b] = IoU(anchors[i, j, n], bboxes[b])
-        arg_truth_bbox = np.argmax(ious, axis=3).flatten()
-        truth_bbox = bboxes[arg_truth_bbox, :].reshape(ious.shape[:3] + (bboxes.shape[-1],))
+                ious[i, j] = IoU(anchors[i], bboxes[j])
+        best_bbox_for_anchor = np.argmax(ious, axis=1)
+        best_anchor_for_bbox = np.argmax(ious, axis=0)
+        max_iou_per_anchor = np.amax(ious, axis=1)
 
-        max_iou_per_anchor = np.amax(ious, axis=3)
+        # truth box for each anchor
+        truth_bbox = bboxes[best_bbox_for_anchor, :]
+
+        # Selecting all ious > POSITIVE_THRESHOLD
         positives = max_iou_per_anchor > self.POSITIVE_THRESHOLD
+        # Adding max iou for each ground truth box
+        positives[best_anchor_for_bbox] = True
         negatives = max_iou_per_anchor < self.NEGATIVE_THRESHOLD
         return truth_bbox, positives, negatives
 
@@ -222,7 +226,28 @@ class ToothImageDataset(Dataset):
 
         anchors = self.get_image_anchors()
         truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
+        print(len(np.where(positives)[0]))
         for bbox in anchors[np.where(positives)]:
+            draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
+
+        # for bbox in anchors[10, 10, :, :]:
+        #     draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
+
+        im.show()
+
+
+    def visualise_sampling_on_image(self, i):
+        im = self.get_resized_image(i)
+        draw = ImageDraw.Draw(im)
+
+        image = self.get_image(i)
+        bboxes = self.get_truth_bboxes(i)
+        anchors = self.get_image_anchors()
+        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
+        indices = np.array([i for i in range(len(anchors))])
+        selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
+
+        for bbox in anchors[selected_indices]:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
 
         im.show()
