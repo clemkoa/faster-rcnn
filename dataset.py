@@ -14,14 +14,6 @@ from PIL import Image, ImageDraw
 
 from utils import nms, get_label_map_from_pbtxt, get_inverse_label_map_from_pbtxt, IoU, parametrize, unparametrize
 
-def softmax(z):
-    s = np.max(z, axis=1)
-    s = s[:, np.newaxis] # necessary step to do broadcasting
-    e_x = np.exp(z - s)
-    div = np.sum(e_x, axis=1)
-    div = div[:, np.newaxis] # dito
-    return e_x / div
-
 class ToothImageDataset(Dataset):
     """Dataset of dental panoramic x-rays"""
 
