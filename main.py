@@ -53,7 +53,6 @@ def infer(dataset):
             cls, reg = rpn(im.float())
             dataset.visualise_proposals_on_image(reg.detach().numpy(), cls.detach().numpy(), i)
             # dataset.visualise_sampling_on_image(i)
-            return
 
 def main(args):
     dataset = ToothImageDataset('data')

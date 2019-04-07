@@ -59,7 +59,7 @@ def nms(dets, cls, thresh):
         inds = np.where(ovr <= thresh)[0]
         order = order[inds + 1]
 
-    return dets[keep], cls[keep]
+    return keep
 
 def parametrize(anchors, bboxes):
     reg = np.zeros(anchors.shape, dtype=np.float32)

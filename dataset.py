@@ -37,9 +37,12 @@ class ToothImageDataset(Dataset):
     NUMBER_ANCHORS_HEIGHT = OUTPUT_SIZE[1]
 
     NEGATIVE_THRESHOLD = 0.3
-    POSITIVE_THRESHOLD = 0.7
+    POSITIVE_THRESHOLD = 0.6
 
     ANCHOR_SAMPLING_SIZE = 256
+
+    NMS_THRESHOLD = 0.7
+    POST_NMS_MAX_PROPOSALS = 100
 
     def __init__(self, root_dir):
         """
@@ -195,59 +198,19 @@ class ToothImageDataset(Dataset):
 
     def visualise_proposals_on_image(self, reg, cls, i):
         im = self.get_resized_image(i)
-
         draw = ImageDraw.Draw(im)
+
+        objects = np.argmax(cls, axis=1)
 
         anchors = self.get_image_anchors()
         bboxes = unparametrize(anchors, reg).reshape((-1, 4))
-        print(cls)
-        cls = softmax(cls)
-        print(cls)
-        cls[cls <= 0.] = 0.0
-        cls = np.argmax(cls, axis=1)
-        # for bbox in bboxes[np.where(cls == 1)]:
-        #     draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'red')
 
-        bboxes, cls = nms(bboxes, cls, 0.6)
+        cls = cls[np.where(objects == 1)]
+        bboxes = bboxes[np.where(objects == 1)]
 
-        for bbox in bboxes[np.where(cls == 1)]:
+        keep = nms(bboxes, cls[:, 1].ravel(), self.NMS_THRESHOLD)
+
+        for bbox in bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]:
             draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
-
-        im.show()
-
-    def visualise_anchors_on_image(self, i):
-        im = self.get_resized_image(i)
-
-        draw = ImageDraw.Draw(im)
-
-        bboxes = self.get_truth_bboxes(i)
-        for bbox in bboxes:
-            draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'blue')
-
-        anchors = self.get_image_anchors()
-        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
-        print(len(np.where(positives)[0]))
-        for bbox in anchors[np.where(positives)]:
-            draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
-
-        # for bbox in anchors[10, 10, :, :]:
-        #     draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
-
-        im.show()
-
-
-    def visualise_sampling_on_image(self, i):
-        im = self.get_resized_image(i)
-        draw = ImageDraw.Draw(im)
-
-        image = self.get_image(i)
-        bboxes = self.get_truth_bboxes(i)
-        anchors = self.get_image_anchors()
-        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
-        indices = np.array([i for i in range(len(anchors))])
-        selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
-
-        for bbox in anchors[selected_indices]:
-            draw.rectangle([bbox[0], bbox[1], bbox[2], bbox[3]], outline = 'green')
 
         im.show()
