@@ -21,9 +21,10 @@ def train(dataset):
 
     for i in range(1, len(dataset)):
         optimizer.zero_grad()
-        im, reg_truth, cls_truth, selected_indices, positives = dataset[i]
+        im, bboxes = dataset[i]
+        reg_truth, cls_truth, selected_indices, positives = rpn.get_target(bboxes)
 
-        cls_output, reg_output = rpn(im.float())
+        cls_output, reg_output = rpn(torch.from_numpy(im).float())
         # only look at positive boxes for regression loss
         reg_loss = F.smooth_l1_loss(reg_output[positives], reg_truth[positives])
         # look at a sample of positive + negative boxes for classification
