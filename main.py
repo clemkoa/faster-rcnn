@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from dataset import ToothImageDataset
-from rpn import RPN
+from src.rpn import RPN
 
 model = 'resnet50'
 MODEL_PATH = os.path.join('models', f'{model}.pt')

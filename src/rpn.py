@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
-from utils import nms, IoU, parametrize, unparametrize
+from src.utils import nms, IoU, parametrize, unparametrize
 
 class RPN(nn.Module):
     INPUT_SIZE = (1600, 800)

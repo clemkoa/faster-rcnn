@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from PIL import Image, ImageDraw
 
-from utils import nms, get_label_map_from_pbtxt, get_inverse_label_map_from_pbtxt, unparametrize
+from src.utils import nms, get_label_map_from_pbtxt, get_inverse_label_map_from_pbtxt, unparametrize
 
 class ToothImageDataset(Dataset):
     """Dataset of dental panoramic x-rays"""
