@@ -4,4 +4,6 @@ https://arxiv.org/abs/1506.01497
 
 
 - ✅ RPN working
-- 📦 Classification network shared with RPN
+- ROI pooling
+- Proposal layer with ground truth for training
+- cls+reg head

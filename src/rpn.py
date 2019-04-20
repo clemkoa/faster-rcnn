@@ -85,7 +85,7 @@ class RPN(nn.Module):
         for r in self.ANCHORS_RATIOS:
             for s in self.ANCHORS_SCALES:
                 width = s * np.sqrt(r)
-                height = s * np.sqrt(1.0/r)
+                height = s * np.sqrt(1.0 / r)
                 dimensions.append((width, height))
         return dimensions
 
@@ -105,6 +105,19 @@ class RPN(nn.Module):
             top_y = center_y - height / 2.0
             anchors[i, :] = [top_x, top_y, top_x + width, top_y + height]
         return anchors
+
+    def get_proposals(self, reg, cls):
+        objects = np.argmax(cls, axis=1)
+
+        anchors = self.get_image_anchors()
+        bboxes = unparametrize(anchors, reg).reshape((-1, 4))
+
+        cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
+        bboxes = bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
+
+        keep = nms(bboxes, cls[:, 1].ravel(), self.NMS_THRESHOLD)
+        cls = cls[keep[:self.POST_NMS_MAX_PROPOSALS]]
+        return bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]
 
     def get_image_anchors(self):
         anchors = np.zeros((self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number, 4))

@@ -49,10 +49,11 @@ def infer(dataset):
 
         # TODO change hardcoded range for test dataset
         for i in range(1, len(dataset)):
-            im, reg_truth, cls_truth, selected_indices, positives = dataset[i]
+            im, bboxes = dataset[i]
+            cls, reg = rpn(torch.from_numpy(im).float())
+            bboxes = rpn.get_proposals(reg.detach().numpy(), cls.detach().numpy())
 
-            cls, reg = rpn(im.float())
-            dataset.visualise_proposals_on_image(reg.detach().numpy(), cls.detach().numpy(), i)
+            dataset.visualise_proposals_on_image(bboxes, i)
 
 def main(args):
     dataset = ToothImageDataset('data')
