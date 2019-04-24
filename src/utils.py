@@ -33,6 +33,9 @@ def get_inverse_label_map_from_pbtxt(file):
 
 
 def nms(dets, cls, thresh):
+    dets = dets.detach().numpy()
+    cls = cls.detach().numpy()
+    thresh = thresh.detach().numpy()
     x1 = dets[:, 0]
     y1 = dets[:, 1]
     x2 = dets[:, 2]
@@ -74,8 +77,8 @@ def parametrize(anchors, bboxes):
     return reg
 
 def unparametrize(anchors, reg):
-    reg = reg.reshape(anchors.shape)
-    bboxes = np.zeros(anchors.shape, dtype=np.float32)
+    reg = reg.view(anchors.shape).float()
+    bboxes = torch.zeros(anchors.shape, dtype=torch.float64)
 
     bboxes[:, 0] = (anchors[:, 2] - anchors[:, 0]) * reg[:, 0] + (anchors[:, 0] + anchors[:, 2]) / 2.0
     bboxes[:, 1] = (anchors[:, 3] - anchors[:, 1]) * reg[:, 1] + (anchors[:, 1] + anchors[:, 3]) / 2.0
@@ -87,7 +90,7 @@ def unparametrize(anchors, reg):
     bboxes[:, 2] = bboxes[:, 0] + bboxes[:, 2]
     bboxes[:, 3] = bboxes[:, 1] + bboxes[:, 3]
 
-    return bboxes
+    return bboxes.float()
 
 def count_positive_anchors_on_image(i, dataset):
     bboxes = dataset.get_truth_bboxes(i)

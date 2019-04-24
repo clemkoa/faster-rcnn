@@ -1,6 +1,7 @@
 import pytest
+import torch
 import numpy as np
-from utils import IoU, parametrize, unparametrize
+from src.utils import IoU, parametrize, unparametrize
 
 def test_iou():
     assert IoU([1, 1, 10, 10], [1, 1, 10, 10]) == 1.0
@@ -23,14 +24,14 @@ def test_parametrize():
     assert np.allclose(parametrize(anchors, bboxes), np.array([[0, 0, np.log(3), np.log(3)]]))
 
 def test_unparametrize():
-    anchors = np.array([[0, 0, 10, 10]])
-    predictions = np.array([[0, 0, 0, 0]])
-    assert np.array_equal(unparametrize(anchors, predictions), np.array([[0, 0, 10, 10]]))
+    anchors = torch.tensor([[0., 0., 10., 10.]])
+    predictions = torch.tensor([[0., 0., 0., 0.]])
+    assert torch.all(torch.eq(unparametrize(anchors, predictions), torch.tensor([[0., 0., 10., 10.]])))
 
-    anchors = np.array([[0, 0, 10, 10]])
-    predictions = np.array([[0, -0.25, 0, np.log(0.5)]])
-    assert np.allclose(unparametrize(anchors, predictions), np.array([[0, 0, 10, 5]]))
+    anchors = torch.tensor([[0., 0., 10., 10.]])
+    predictions = torch.tensor([[0, -0.25, 0, np.log(0.5)]])
+    assert torch.allclose(unparametrize(anchors, predictions), torch.tensor([[0., 0., 10., 5.]]))
 
-    anchors = np.array([[10, 10, 20, 20]])
-    predictions = np.array([[0, 0, np.log(3), np.log(3)]])
-    assert np.allclose(unparametrize(anchors, predictions), np.array([[0, 0, 30, 30]]))
+    anchors = torch.tensor([[10., 10., 20., 20.]])
+    predictions = torch.tensor([[0, 0, np.log(3), np.log(3)]])
+    assert torch.allclose(unparametrize(anchors, predictions), torch.tensor([[0., 0., 30., 30.]]))

@@ -24,3 +24,4 @@ class FasterRCNN(nn.Module):
 
     def forward(self, x):
         cls, reg = self.rpn(x)
+        proposals = rpn.get_proposals_p(reg, cls)

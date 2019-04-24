@@ -51,7 +51,7 @@ def infer(dataset):
         for i in range(1, len(dataset)):
             im, bboxes = dataset[i]
             cls, reg = rpn(torch.from_numpy(im).float())
-            bboxes = rpn.get_proposals(reg.detach().numpy(), cls.detach().numpy())
+            bboxes = rpn.get_proposals_p(reg, cls)
 
             dataset.visualise_proposals_on_image(bboxes, i)
 
