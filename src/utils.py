@@ -31,11 +31,7 @@ def get_inverse_label_map_from_pbtxt(file):
         result[item['name']] = int(item['id'])
     return result
 
-
 def nms(dets, cls, thresh):
-    dets = dets.detach().numpy()
-    cls = cls.detach().numpy()
-    thresh = thresh.detach().numpy()
     x1 = dets[:, 0]
     y1 = dets[:, 1]
     x2 = dets[:, 2]
@@ -82,8 +78,8 @@ def unparametrize(anchors, reg):
 
     bboxes[:, 0] = (anchors[:, 2] - anchors[:, 0]) * reg[:, 0] + (anchors[:, 0] + anchors[:, 2]) / 2.0
     bboxes[:, 1] = (anchors[:, 3] - anchors[:, 1]) * reg[:, 1] + (anchors[:, 1] + anchors[:, 3]) / 2.0
-    bboxes[:, 2] = (anchors[:, 2] - anchors[:, 0]) * np.exp(reg[:, 2])
-    bboxes[:, 3] = (anchors[:, 3] - anchors[:, 1]) * np.exp(reg[:, 3])
+    bboxes[:, 2] = (anchors[:, 2] - anchors[:, 0]) * torch.exp(reg[:, 2])
+    bboxes[:, 3] = (anchors[:, 3] - anchors[:, 1]) * torch.exp(reg[:, 3])
 
     bboxes[:, 0] = bboxes[:, 0] - bboxes[:, 2] / 2.0
     bboxes[:, 1] = bboxes[:, 1] - bboxes[:, 3] / 2.0

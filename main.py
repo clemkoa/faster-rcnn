@@ -8,9 +8,17 @@ import torch.nn.functional as F
 import torch.optim as optim
 from dataset import ToothImageDataset
 from src.rpn import RPN
+from src.fasterrcnn import FasterRCNN
 
 model = 'resnet50'
 MODEL_PATH = os.path.join('models', f'{model}.pt')
+
+def test(dataset):
+    fasterrcnn = FasterRCNN(4, model=model, path=MODEL_PATH)
+    for i in range(1, len(dataset)):
+        im, bboxes = dataset[i]
+        proposals = fasterrcnn(torch.from_numpy(im).float())
+        return
 
 def train(dataset):
     save_range = 10
@@ -51,7 +59,7 @@ def infer(dataset):
         for i in range(1, len(dataset)):
             im, bboxes = dataset[i]
             cls, reg = rpn(torch.from_numpy(im).float())
-            bboxes = rpn.get_proposals_p(reg, cls)
+            bboxes = rpn.get_proposals(reg, cls)
 
             dataset.visualise_proposals_on_image(bboxes, i)
 
@@ -61,11 +69,14 @@ def main(args):
         infer(dataset)
     if args.train:
         train(dataset)
+    if args.test:
+        test(dataset)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--train', action='store_true')
     parser.add_argument('-i', '--infer', action='store_true')
+    parser.add_argument('-test', '--test', action='store_true')
     args = parser.parse_args()
 
     main(args)

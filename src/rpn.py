@@ -107,28 +107,14 @@ class RPN(nn.Module):
         return anchors
 
     def get_proposals(self, reg, cls):
-        objects = np.argmax(cls, axis=1)
-
-        anchors = self.get_image_anchors()
-        bboxes = unparametrize(anchors, reg).reshape((-1, 4))
-
-        cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
-        bboxes = bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
-
-        keep = nms(bboxes, cls[:, 1].ravel(), self.NMS_THRESHOLD)
-        cls = cls[keep[:self.POST_NMS_MAX_PROPOSALS]]
-        return bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]
-
-    def get_proposals_p(self, reg, cls):
         objects = torch.argmax(cls, dim=1)
         anchors = torch.from_numpy(self.get_image_anchors()).float()
         bboxes = unparametrize(anchors, reg)
-        print(bboxes)
 
+        cls = cls.detach().numpy()
         cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
         bboxes = bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
-
-        keep = nms(bboxes, cls[:, 1].ravel(), self.NMS_THRESHOLD)
+        keep = nms(bboxes.detach().numpy(), cls[:, 1].ravel(), self.NMS_THRESHOLD)
         cls = cls[keep[:self.POST_NMS_MAX_PROPOSALS]]
         return bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]
 
