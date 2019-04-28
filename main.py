@@ -16,8 +16,9 @@ MODEL_PATH = os.path.join('models', f'{model}.pt')
 def test(dataset):
     fasterrcnn = FasterRCNN(4, model=model, path=MODEL_PATH)
     for i in range(1, len(dataset)):
-        im, bboxes = dataset[i]
-        proposals = fasterrcnn(torch.from_numpy(im).float())
+        im, bboxes, classes = dataset[i]
+        all_cls, all_reg, proposals = fasterrcnn(torch.from_numpy(im).float())
+        fasterrcnn.get_target(proposals, bboxes)
         return
 
 def train(dataset):
@@ -29,7 +30,7 @@ def train(dataset):
 
     for i in range(1, len(dataset)):
         optimizer.zero_grad()
-        im, bboxes = dataset[i]
+        im, bboxes, classes = dataset[i]
         reg_truth, cls_truth, selected_indices, positives = rpn.get_target(bboxes)
 
         cls_output, reg_output = rpn(torch.from_numpy(im).float())
@@ -57,7 +58,7 @@ def infer(dataset):
 
         # TODO change hardcoded range for test dataset
         for i in range(1, len(dataset)):
-            im, bboxes = dataset[i]
+            im, bboxes, classes = dataset[i]
             cls, reg = rpn(torch.from_numpy(im).float())
             bboxes = rpn.get_proposals(reg, cls)
 

@@ -35,10 +35,10 @@ class ToothImageDataset(Dataset):
 
     def __getitem__(self, i):
         image = self.get_image(i)
-        bboxes = self.get_truth_bboxes(i)
+        bboxes, classes = self.get_truth_bboxes(i)
         # image input is grayscale, convert to rgb
         im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
-        return im, bboxes
+        return im, bboxes, classes
 
     def get_image(self, i):
         path = os.path.join(self.root_dir, 'JPEGImages', str(i) + '.png')
@@ -64,6 +64,7 @@ class ToothImageDataset(Dataset):
 
         raw_boxes = [child for child in root if child.tag == 'object']
         bboxes = np.array([[[int(d.text) for d in c] for c in object if c.tag == 'bndbox'] for object in raw_boxes])
+        classes = [int(self.inverse_label_map[c.text]) for object in raw_boxes for c in object if c.tag == 'name']
         if not len(bboxes):
             return np.array([])
 
@@ -72,7 +73,7 @@ class ToothImageDataset(Dataset):
             bboxes[:, i] = bboxes[:, i] / width_ratio
         for i in [1, 3]:
             bboxes[:, i] = bboxes[:, i] / height_ratio
-        return bboxes
+        return bboxes, classes
 
     def get_label_map(self, label_map_path):
         return get_label_map_from_pbtxt(label_map_path)
