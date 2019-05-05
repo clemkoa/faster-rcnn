@@ -65,7 +65,7 @@ class FasterRCNN(nn.Module):
             r_cls = F.softmax(self.cls_layer(r), dim=1)
             r_reg = self.reg_layer(r)
             all_cls.append(r_cls)
-            all_reg.append(r_reg.view((self.n_classes, 4)))
+            all_reg.append(r_reg.view((self.n_classes, 4))[torch.argmax(r_cls)])
 
         return torch.stack(all_cls).view((-1, self.n_classes)), torch.stack(all_reg), proposals, cls, reg
 
@@ -94,4 +94,4 @@ class FasterRCNN(nn.Module):
         # Keep positives and negatives
         selected = np.where(positives | negatives)
 
-        return labels[selected], truth_bbox[selected]
+        return torch.from_numpy(labels[selected]), torch.from_numpy(truth_bbox[selected])

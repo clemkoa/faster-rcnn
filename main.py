@@ -24,9 +24,6 @@ def train_fasterrcnn(dataset):
         optimizer.zero_grad()
         im, bboxes, classes = dataset[i]
         all_cls, all_reg, proposals, rpn_cls, rpn_reg = fasterrcnn(torch.from_numpy(im).float())
-        # print(keep)
-        # print(all_reg.shape)
-        # print(all_cls.shape)
 
         rpn_reg_target, rpn_cls_target, rpn_selected_indices, rpn_positives = fasterrcnn.rpn.get_target(bboxes)
         cls_target, reg_target = fasterrcnn.get_target(proposals, bboxes, classes)
@@ -36,11 +33,9 @@ def train_fasterrcnn(dataset):
         rpn_cls_loss = F.binary_cross_entropy(rpn_cls[rpn_selected_indices], rpn_cls_target[rpn_selected_indices].float())
 
         fastrcnn_reg_loss = F.smooth_l1_loss(all_reg, reg_target)
-        fastrcnn_cls_loss = F.binary_cross_entropy(all_cls, cls_target)
-
+        fastrcnn_cls_loss = F.cross_entropy(all_cls, cls_target)
         rpn_loss = rpn_cls_loss + lamb * rpn_reg_loss
         fastrcnn_loss = fastrcnn_cls_loss + lamb * fastrcnn_reg_loss
-        print(rpn_loss, fastrcnn_loss)
 
         loss = rpn_loss + fastrcnn_loss
 
