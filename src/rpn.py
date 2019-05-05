@@ -107,17 +107,30 @@ class RPN(nn.Module):
         return anchors
 
     def get_proposals(self, reg, cls):
+        objects = torch.argmax(cls, dim=1)
+        anchors = torch.from_numpy(self.get_image_anchors()).float()
+        bboxes = unparametrize(anchors, reg)
+
+        cls = cls.detach().numpy()
+        cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
+        bboxes = bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
+        keep = nms(bboxes.detach().numpy(), cls[:, 1].ravel(), self.NMS_THRESHOLD)[:self.POST_NMS_MAX_PROPOSALS]
+        return bboxes[keep]
+
+    def get_training_proposals(self, truth_bboxes, reg, cls):
         objects = np.argmax(cls, axis=1)
 
         anchors = self.get_image_anchors()
-        bboxes = unparametrize(anchors, reg).reshape((-1, 4))
+        predicted_bboxes = unparametrize(anchors, reg).reshape((-1, 4))
+        print(predicted_bboxes.shape)
+        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
 
         cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
-        bboxes = bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
+        predicted_bboxes = predicted_bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
 
-        keep = nms(bboxes, cls[:, 1].ravel(), self.NMS_THRESHOLD)
+        keep = nms(predicted_bboxes, cls[:, 1].ravel(), self.NMS_THRESHOLD)
         cls = cls[keep[:self.POST_NMS_MAX_PROPOSALS]]
-        return bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]
+        return predicted_bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]
 
     def get_image_anchors(self):
         anchors = np.zeros((self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number, 4))
