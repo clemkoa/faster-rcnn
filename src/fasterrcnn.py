@@ -62,10 +62,10 @@ class FasterRCNN(nn.Module):
             roi_feature_map = feature_map[:, roi[0]:roi[2]+1, roi[1]:roi[3]+1]
             pooled_roi = F.adaptive_max_pool2d(roi_feature_map, (7, 7)).view((-1, 50176))
             r = self.fc(pooled_roi)
-            r_cls = F.softmax(self.cls_layer(r), dim=1)
-            r_reg = self.reg_layer(r)
+            r_cls = self.cls_layer(r)
+            r_reg = self.reg_layer(r).view((self.n_classes, 4))
             all_cls.append(r_cls)
-            all_reg.append(r_reg.view((self.n_classes, 4))[torch.argmax(r_cls)])
+            all_reg.append(r_reg[torch.argmax(r_cls)])
 
         return torch.stack(all_cls).view((-1, self.n_classes)), torch.stack(all_reg), proposals, cls, reg
 
