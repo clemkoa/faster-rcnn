@@ -5,7 +5,6 @@ import re
 import xml.etree.ElementTree as ET
 import numpy as np
 import cv2
-from PIL import Image
 from skimage import io
 from skimage.transform import resize
 from torch.utils.data import Dataset, DataLoader
@@ -40,6 +39,9 @@ class ToothImageDataset(Dataset):
         im = np.expand_dims(np.stack((resize(image, self.INPUT_SIZE),)*3), axis=0)
         return im, bboxes, classes
 
+    def get_classes(self):
+        return list(self.inverse_label_map.values())
+
     def get_image(self, i):
         path = os.path.join(self.root_dir, 'JPEGImages', str(i) + '.png')
         img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
@@ -64,7 +66,7 @@ class ToothImageDataset(Dataset):
 
         raw_boxes = [child for child in root if child.tag == 'object']
         bboxes = np.array([[[int(d.text) for d in c] for c in object if c.tag == 'bndbox'] for object in raw_boxes])
-        classes = [int(self.inverse_label_map[c.text]) for object in raw_boxes for c in object if c.tag == 'name']
+        classes = np.array([int(self.inverse_label_map[c.text]) for object in raw_boxes for c in object if c.tag == 'name'])
         if not len(bboxes):
             return np.array([])
 
