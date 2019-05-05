@@ -114,9 +114,8 @@ class RPN(nn.Module):
         cls = cls.detach().numpy()
         cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
         bboxes = bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
-        keep = nms(bboxes.detach().numpy(), cls[:, 1].ravel(), self.NMS_THRESHOLD)
-        cls = cls[keep[:self.POST_NMS_MAX_PROPOSALS]]
-        return bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]
+        keep = nms(bboxes.detach().numpy(), cls[:, 1].ravel(), self.NMS_THRESHOLD)[:self.POST_NMS_MAX_PROPOSALS]
+        return bboxes[keep]
 
     def get_training_proposals(self, truth_bboxes, reg, cls):
         objects = np.argmax(cls, axis=1)
