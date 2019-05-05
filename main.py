@@ -13,7 +13,7 @@ from src.fasterrcnn import FasterRCNN
 model = 'resnet50'
 MODEL_PATH = os.path.join('models', f'fasterrcnn_{model}.pt')
 
-def train_fasterrcnn(dataset):
+def train(dataset):
     save_range = 10
     lamb = 10.0
 
@@ -48,37 +48,6 @@ def train_fasterrcnn(dataset):
             torch.save(fasterrcnn.state_dict(), MODEL_PATH)
     print('Finished Training')
 
-def train(dataset):
-    save_range = 10
-    lamb = 10.0
-
-    rpn = RPN(model=model, path=MODEL_PATH)
-    optimizer = optim.SGD(rpn.parameters(), lr = 0.1)
-
-    for i in range(1, len(dataset)):
-        optimizer.zero_grad()
-        im, bboxes, classes = dataset[i]
-        reg_truth, cls_truth, selected_indices, positives = rpn.get_target(bboxes)
-
-        cls_output, reg_output = rpn(torch.from_numpy(im).float())
-        # only look at positive boxes for regression loss
-        reg_loss = F.smooth_l1_loss(reg_output[positives], reg_truth[positives])
-        # look at a sample of positive + negative boxes for classification
-        cls_loss = F.binary_cross_entropy(cls_output[selected_indices], cls_truth[selected_indices].float())
-
-        loss = cls_loss + lamb * reg_loss
-        if not len(positives):
-            loss = cls_loss
-
-        loss.backward()
-        optimizer.step()
-
-        print('[%d] loss: %.5f' % (i, loss.item()))
-
-        if i % save_range == 0:
-            torch.save(rpn.state_dict(), MODEL_PATH)
-    print('Finished Training')
-
 def infer(dataset):
     with torch.no_grad():
         rpn = RPN(model=model, path=MODEL_PATH)
@@ -97,8 +66,6 @@ def main(args):
         infer(dataset)
     if args.train:
         train(dataset)
-    if args.test:
-        train_fasterrcnn(dataset)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
