@@ -41,7 +41,7 @@ class FasterRCNN(nn.Module):
         self.out_fc_dim = 1024
 
         rpn_path = path.replace('fasterrcnn_', '')
-        self.rpn = RPN(model=model, path=rpn_path)
+        self.rpn = RPN(self.in_dim)
         self.fc = nn.Linear(self.in_fc_dim, self.out_fc_dim)
         self.cls_layer = nn.Linear(self.out_fc_dim, self.n_classes)
         self.reg_layer = nn.Linear(self.out_fc_dim, self.n_classes * 4)
@@ -49,19 +49,20 @@ class FasterRCNN(nn.Module):
         if os.path.isfile(path):
             self.load_state_dict(torch.load(path))
 
-
     def forward(self, x):
-        feature_map = self.feature_map(x).view((-1, 100, 50))
-        cls, reg = self.rpn(x)
+        feature_map = self.feature_map(x)
+        cls, reg = self.rpn(feature_map)
+        feature_map = feature_map.view((-1, self.OUTPUT_SIZE[0], self.OUTPUT_SIZE[1]))
         proposals = self.rpn.get_proposals(reg, cls)
 
         all_cls = []
         all_reg = []
         for roi in proposals.int():
+            roi[np.where(roi < 0)] = 0
             roi = roi / self.OUTPUT_CELL_SIZE
             roi_feature_map = feature_map[:, roi[0]:roi[2]+1, roi[1]:roi[3]+1]
             pooled_roi = F.adaptive_max_pool2d(roi_feature_map, (7, 7)).view((-1, 50176))
-            r = self.fc(pooled_roi)
+            r = F.relu(self.fc(pooled_roi))
             r_cls = self.cls_layer(r)
             r_reg = self.reg_layer(r).view((self.n_classes, 4))
             all_cls.append(r_cls)
@@ -95,3 +96,12 @@ class FasterRCNN(nn.Module):
         selected = np.where(positives | negatives)
 
         return torch.from_numpy(labels[selected]), torch.from_numpy(truth_bbox[selected])
+
+    def get_proposals(self, reg, cls, rpn_proposals):
+        # print(cls)
+        # print(F.softmax(cls, dim=1))
+        # print(cls.shape)
+        objects = torch.argmax(F.softmax(cls, dim=1), dim=1)
+        bboxes = unparametrize(rpn_proposals, reg)
+
+        return bboxes[np.where(objects != 0)]
