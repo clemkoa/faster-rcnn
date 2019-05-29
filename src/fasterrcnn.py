@@ -16,7 +16,7 @@ class FasterRCNN(nn.Module):
     OUTPUT_CELL_SIZE = float(INPUT_SIZE[0]) / float(OUTPUT_SIZE[0])
 
     NEGATIVE_THRESHOLD = 0.3
-    POSITIVE_THRESHOLD = 0.6
+    POSITIVE_THRESHOLD = 0.5
 
     def __init__(self, n_classes, model='resnet50', path='fasterrcnn_resnet50.pt'):
         super(FasterRCNN, self).__init__()
@@ -45,6 +45,11 @@ class FasterRCNN(nn.Module):
         self.fc = nn.Linear(self.in_fc_dim, self.out_fc_dim)
         self.cls_layer = nn.Linear(self.out_fc_dim, self.n_classes)
         self.reg_layer = nn.Linear(self.out_fc_dim, self.n_classes * 4)
+
+        #initialize layers
+        torch.nn.init.normal_(self.fc.weight, std=0.01)
+        torch.nn.init.normal_(self.cls_layer.weight, std=0.1)
+        torch.nn.init.normal_(self.reg_layer.weight, std=0.01)
 
         if os.path.isfile(path):
             self.load_state_dict(torch.load(path))

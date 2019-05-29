@@ -18,7 +18,7 @@ def train(dataset):
     lamb = 10.0
 
     fasterrcnn = FasterRCNN(len(dataset.get_classes()), model=model, path=MODEL_PATH)
-    optimizer = optim.SGD(fasterrcnn.parameters(), lr = 0.001)
+    optimizer = optim.Adam(fasterrcnn.parameters(), lr = 0.001)
 
     for i in range(1, len(dataset)):
         optimizer.zero_grad()
@@ -37,7 +37,7 @@ def train(dataset):
         fastrcnn_cls_loss = F.cross_entropy(all_cls, cls_target)
         rpn_loss = rpn_cls_loss + lamb * rpn_reg_loss
 
-        fastrcnn_loss = fastrcnn_cls_loss + lamb * fastrcnn_reg_loss
+        fastrcnn_loss = fastrcnn_cls_loss + fastrcnn_reg_loss
 
         loss = rpn_loss + fastrcnn_loss
 
