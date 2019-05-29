@@ -28,18 +28,10 @@ class RPN(nn.Module):
     PRE_NMS_MAX_PROPOSALS = 6000
     POST_NMS_MAX_PROPOSALS = 100
 
-    def __init__(self, model='resnet50', path='resnet50.pt'):
+    def __init__(self, in_dim):
         super(RPN, self).__init__()
 
-        if model == 'resnet50':
-            self.in_dim = 1024
-            resnet = models.resnet50(pretrained=True)
-            self.feature_map = nn.Sequential(*list(resnet.children())[:-3])
-        if model == 'vgg16':
-            self.in_dim = 512
-            vgg = models.vgg16(pretrained=True)
-            self.feature_map = nn.Sequential(*list(vgg.children())[:-1])
-
+        self.in_dim = in_dim
         self.anchor_dimensions = self.get_anchor_dimensions()
         self.anchor_number = len(self.anchor_dimensions)
         mid_layers = 1024
@@ -54,11 +46,9 @@ class RPN(nn.Module):
         torch.nn.init.normal_(self.cls_layer.weight, std=0.01)
         torch.nn.init.normal_(self.reg_layer.weight, std=0.01)
 
-        if os.path.isfile(path):
-            self.load_state_dict(torch.load(path))
-
     def forward(self, x):
-        rpn_conv = F.relu(self.RPN_conv(self.feature_map(x)), inplace=True)
+        ''' Takes feature map as input'''
+        rpn_conv = F.relu(self.RPN_conv(x), inplace=True)
         # permute dimensions
         cls_output = self.cls_layer(rpn_conv).permute(0, 2, 3, 1).contiguous().view(1, -1, 2)
         reg_output = self.reg_layer(rpn_conv).permute(0, 2, 3, 1).contiguous().view(1, -1, 4)

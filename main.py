@@ -18,7 +18,7 @@ def train(dataset):
     lamb = 10.0
 
     fasterrcnn = FasterRCNN(len(dataset.get_classes()), model=model, path=MODEL_PATH)
-    optimizer = optim.SGD(fasterrcnn.parameters(), lr = 0.001)
+    optimizer = optim.Adam(fasterrcnn.parameters(), lr = 0.001)
 
     for i in range(1, len(dataset)):
         optimizer.zero_grad()
@@ -27,6 +27,7 @@ def train(dataset):
 
         rpn_reg_target, rpn_cls_target, rpn_selected_indices, rpn_positives = fasterrcnn.rpn.get_target(bboxes)
         cls_target, reg_target = fasterrcnn.get_target(proposals, bboxes, classes)
+        print(cls_target)
 
         rpn_reg_loss = F.smooth_l1_loss(rpn_reg[rpn_positives], rpn_reg_target[rpn_positives])
         # look at a sample of positive + negative boxes for classification
@@ -36,7 +37,7 @@ def train(dataset):
         fastrcnn_cls_loss = F.cross_entropy(all_cls, cls_target)
         rpn_loss = rpn_cls_loss + lamb * rpn_reg_loss
 
-        fastrcnn_loss = fastrcnn_cls_loss + lamb * fastrcnn_reg_loss
+        fastrcnn_loss = fastrcnn_cls_loss + fastrcnn_reg_loss
 
         loss = rpn_loss + fastrcnn_loss
 
@@ -51,13 +52,13 @@ def train(dataset):
 
 def infer(dataset):
     with torch.no_grad():
-        rpn = RPN(model=model, path=MODEL_PATH)
+        fasterrcnn = FasterRCNN(len(dataset.get_classes()), model=model, path=MODEL_PATH)
 
         # TODO change hardcoded range for test dataset
         for i in range(1, len(dataset)):
             im, bboxes, classes = dataset[i]
-            cls, reg = rpn(torch.from_numpy(im).float())
-            bboxes = rpn.get_proposals(reg, cls)
+            cls, reg, rpn_proposals, rpn_cls, rpn_reg = fasterrcnn(torch.from_numpy(im).float())
+            bboxes = fasterrcnn.get_proposals(reg, cls, rpn_proposals)
 
             dataset.visualise_proposals_on_image(bboxes, i)
 
