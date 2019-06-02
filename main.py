@@ -14,7 +14,7 @@ model = 'resnet50'
 MODEL_PATH = os.path.join('models', f'fasterrcnn_{model}.pt')
 
 def train(dataset):
-    save_range = 10
+    save_range = 40
     lamb = 10.0
 
     fasterrcnn = FasterRCNN(len(dataset.get_classes()), model=model, path=MODEL_PATH)

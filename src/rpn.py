@@ -130,7 +130,7 @@ class RPN(nn.Module):
                 anchors_pos = self.get_anchors_at_position((i, j))
                 anchors[i, j, :] = anchors_pos
 
-        return anchors.reshape((-1, 4))
+        return np.where(anchors >= 0, anchors, 0.0).reshape((-1, 4))
 
     def get_positive_negative_anchors(self, anchors, bboxes):
         if not len(bboxes):
