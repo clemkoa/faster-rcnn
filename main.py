@@ -16,13 +16,17 @@ MODEL_PATH = os.path.join('models', f'fasterrcnn_{model}.pt')
 def train(dataset):
     save_range = 40
     lamb = 10.0
+    n_classes = len(dataset.get_classes())
 
-    fasterrcnn = FasterRCNN(len(dataset.get_classes()), model=model, path=MODEL_PATH)
-    optimizer = optim.Adam(fasterrcnn.parameters(), lr = 0.001)
+    fasterrcnn = FasterRCNN(n_classes, model=model, path=MODEL_PATH, training=True)
+    optimizer = optim.Adam(fasterrcnn.parameters(), lr = 0.0001)
 
     for i in range(1, len(dataset)):
-        optimizer.zero_grad()
         im, bboxes, classes = dataset[i]
+        if not len(classes):
+            continue
+        print(i)
+        optimizer.zero_grad()
         all_cls, all_reg, proposals, rpn_cls, rpn_reg = fasterrcnn(torch.from_numpy(im).float())
 
         rpn_reg_target, rpn_cls_target, rpn_selected_indices, rpn_positives = fasterrcnn.rpn.get_target(bboxes)

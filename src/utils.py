@@ -90,7 +90,7 @@ def unparametrize(anchors, reg):
 
 def count_positive_anchors_on_image(i, dataset):
     bboxes = dataset.get_truth_bboxes(i)
-    anchors = dataset.get_image_anchors()
+    anchors, _ = dataset.get_image_anchors()
     truth_bbox, positives, negatives = dataset.get_positive_negative_anchors(anchors, bboxes)
     print(anchors[np.where(positives)])
     return len(np.where(positives))

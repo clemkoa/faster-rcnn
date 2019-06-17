@@ -77,7 +77,7 @@ class FasterRCNN(nn.Module):
             r_reg = self.reg_layer(r).view((self.n_classes, 4))
             all_cls.append(r_cls)
             all_reg.append(r_reg[torch.argmax(r_cls)])
-
+        # print(all_cls.shape, all_reg.shape)
         return torch.stack(all_cls).view((-1, self.n_classes)), torch.stack(all_reg), proposals, cls, reg
 
     def get_target(self, proposals, bboxes, classes):

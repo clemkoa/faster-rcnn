@@ -58,7 +58,7 @@ class RPN(nn.Module):
         return cls_output, reg_output
 
     def get_target(self, bboxes):
-        anchors = self.get_image_anchors()
+        anchors, filter_out = self.get_image_anchors()
         truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
         reg_target = parametrize(anchors, truth_bbox)
 
@@ -97,9 +97,11 @@ class RPN(nn.Module):
         return anchors
 
     def get_proposals(self, reg, cls):
-        objects = torch.argmax(cls, dim=1)
-        anchors = torch.from_numpy(self.get_image_anchors()).float()
-        bboxes = unparametrize(anchors, reg)
+        a, filter_out = self.get_image_anchors()
+        anchors = torch.from_numpy(a).float()
+        bboxes = unparametrize(anchors, reg).reshape((-1, 4))
+        bboxes = bboxes[filter_out]
+        objects = torch.argmax(cls[filter_out], dim=1)
 
         cls = cls.detach().numpy()
         cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
@@ -107,30 +109,30 @@ class RPN(nn.Module):
         keep = nms(bboxes.detach().numpy(), cls[:, 1].ravel(), self.NMS_THRESHOLD)[:self.POST_NMS_MAX_PROPOSALS]
         return bboxes[keep]
 
-    def get_training_proposals(self, truth_bboxes, reg, cls):
-        objects = np.argmax(cls, axis=1)
+    def get_training_proposals(self, reg, cls):
+        a, filter_out = self.get_image_anchors()
+        anchors = torch.from_numpy(a).float()
+        bboxes = unparametrize(anchors, reg).reshape((-1, 4))
+        bboxes = bboxes[filter_out]
+        objects = torch.argmax(cls[filter_out], dim=1)
 
-        anchors = self.get_image_anchors()
-        predicted_bboxes = unparametrize(anchors, reg).reshape((-1, 4))
-        print(predicted_bboxes.shape)
-        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
-
+        cls = cls.detach().numpy()
         cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
-        predicted_bboxes = predicted_bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
-
-        keep = nms(predicted_bboxes, cls[:, 1].ravel(), self.NMS_THRESHOLD)
-        cls = cls[keep[:self.POST_NMS_MAX_PROPOSALS]]
-        return predicted_bboxes[keep[:self.POST_NMS_MAX_PROPOSALS]]
+        bboxes = bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
+        keep = nms(bboxes.detach().numpy(), cls[:, 1].ravel(), self.NMS_THRESHOLD)[:self.POST_NMS_MAX_PROPOSALS]
+        return bboxes[keep]
 
     def get_image_anchors(self):
+        print('get_image_anchors')
         anchors = np.zeros((self.NUMBER_ANCHORS_WIDE, self.NUMBER_ANCHORS_HEIGHT, self.anchor_number, 4))
 
         for i in range(self.NUMBER_ANCHORS_WIDE):
             for j in range(self.NUMBER_ANCHORS_HEIGHT):
                 anchors_pos = self.get_anchors_at_position((i, j))
                 anchors[i, j, :] = anchors_pos
-
-        return np.where(anchors >= 0, anchors, 0.0).reshape((-1, 4))
+        anchors = anchors.reshape((-1, 4))
+        filter_out = (anchors[:, 0] < 0) | (anchors[:, 1] < 0) | (anchors[:, 2] > self.INPUT_SIZE[0]) | (anchors[:, 3] > self.INPUT_SIZE[1])
+        return anchors, np.where(~filter_out)
 
     def get_positive_negative_anchors(self, anchors, bboxes):
         if not len(bboxes):
@@ -166,3 +168,12 @@ class RPN(nn.Module):
         random_negatives = np.random.permutation(negative_indices)[:self.ANCHOR_SAMPLING_SIZE - len(random_positives)]
         selected_indices = np.concatenate((random_positives, random_negatives))
         return selected_indices, positive_indices
+
+    def get_positive_anchors(self, bboxes):
+        anchors, _ = self.get_image_anchors()
+        truth_bbox, positives, negatives = self.get_positive_negative_anchors(anchors, bboxes)
+
+        n = len(anchors)
+        indices = np.array([i for i in range(n)])
+        selected_indices, positive_indices = self.get_selected_indices_sample(indices, positives, negatives)
+        return anchors[positive_indices]
