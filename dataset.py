@@ -13,9 +13,7 @@ from PIL import Image, ImageDraw
 
 from src.utils import nms, get_label_map_from_pbtxt, get_inverse_label_map_from_pbtxt, unparametrize
 
-class ToothImageDataset(Dataset):
-    """Dataset of dental panoramic x-rays"""
-
+class VOCDataset(Dataset):
     INPUT_SIZE = (1600, 800)
 
     def __init__(self, root_dir):
@@ -68,7 +66,7 @@ class ToothImageDataset(Dataset):
         bboxes = np.array([[[int(d.text) for d in c] for c in object if c.tag == 'bndbox'] for object in raw_boxes])
         classes = np.array([int(self.inverse_label_map[c.text]) for object in raw_boxes for c in object if c.tag == 'name'])
         if not len(bboxes):
-            return np.array([])
+            return np.array([]), np.array([])
 
         bboxes = bboxes.reshape(-1, bboxes.shape[-1])
         for i in [0, 2]:

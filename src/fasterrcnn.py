@@ -18,7 +18,7 @@ class FasterRCNN(nn.Module):
     NEGATIVE_THRESHOLD = 0.3
     POSITIVE_THRESHOLD = 0.5
 
-    def __init__(self, n_classes, model='resnet50', path='fasterrcnn_resnet50.pt'):
+    def __init__(self, n_classes, model='resnet50', path='fasterrcnn_resnet50.pt', training=False):
         super(FasterRCNN, self).__init__()
 
         self.n_roi_sample = 128
@@ -46,6 +46,8 @@ class FasterRCNN(nn.Module):
         self.cls_layer = nn.Linear(self.out_fc_dim, self.n_classes)
         self.reg_layer = nn.Linear(self.out_fc_dim, self.n_classes * 4)
 
+        self.training = training
+
         #initialize layers
         torch.nn.init.normal_(self.fc.weight, std=0.01)
         torch.nn.init.normal_(self.cls_layer.weight, std=0.1)
@@ -58,7 +60,10 @@ class FasterRCNN(nn.Module):
         feature_map = self.feature_map(x)
         cls, reg = self.rpn(feature_map)
         feature_map = feature_map.view((-1, self.OUTPUT_SIZE[0], self.OUTPUT_SIZE[1]))
-        proposals = self.rpn.get_proposals(reg, cls)
+        if self.training:
+            proposals = self.rpn.get_proposals(reg, cls)
+        else:
+            proposals = self.rpn.get_proposals(reg, cls)
 
         all_cls = []
         all_reg = []
@@ -72,7 +77,7 @@ class FasterRCNN(nn.Module):
             r_reg = self.reg_layer(r).view((self.n_classes, 4))
             all_cls.append(r_cls)
             all_reg.append(r_reg[torch.argmax(r_cls)])
-
+        # print(all_cls.shape, all_reg.shape)
         return torch.stack(all_cls).view((-1, self.n_classes)), torch.stack(all_reg), proposals, cls, reg
 
     def get_target(self, proposals, bboxes, classes):
