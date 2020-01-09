@@ -27,6 +27,7 @@ class RPN(nn.Module):
     NMS_THRESHOLD = 0.5
     PRE_NMS_MAX_PROPOSALS = 6000
     POST_NMS_MAX_PROPOSALS = 100
+    POST_NMS_TRAINING_MAX_PROPOSALS = 300
 
     def __init__(self, in_dim):
         super(RPN, self).__init__()
@@ -110,16 +111,22 @@ class RPN(nn.Module):
         return bboxes[keep]
 
     def get_training_proposals(self, reg, cls):
+        print('get_training_proposals')
         a, filter_out = self.get_image_anchors()
         anchors = torch.from_numpy(a).float()
         bboxes = unparametrize(anchors, reg).reshape((-1, 4))
         bboxes = bboxes[filter_out]
         objects = torch.argmax(cls[filter_out], dim=1)
 
+        indices = np.array([i for i in range(len(objects))])
+        selected_positive_indices = np.random.permutation(indices[np.where(objects == 1)])[:self.PRE_NMS_MAX_PROPOSALS]
+        selected_indices = np.random.permutation(indices)[:self.PRE_NMS_MAX_PROPOSALS]
+
         cls = cls.detach().numpy()
-        cls = cls[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
-        bboxes = bboxes[np.where(objects == 1)][:self.PRE_NMS_MAX_PROPOSALS]
-        keep = nms(bboxes.detach().numpy(), cls[:, 1].ravel(), self.NMS_THRESHOLD)[:self.POST_NMS_MAX_PROPOSALS]
+        keep = nms(bboxes[selected_positive_indices].detach().numpy(), cls[selected_positive_indices][:, 1].ravel(), self.NMS_THRESHOLD)[:self.POST_NMS_TRAINING_MAX_PROPOSALS]
+        if len(keep) < self.POST_NMS_TRAINING_MAX_PROPOSALS:
+            print('not enough objects', len(keep))
+            keep += list(selected_indices[:self.POST_NMS_TRAINING_MAX_PROPOSALS - len(keep)])
         return bboxes[keep]
 
     def get_image_anchors(self):

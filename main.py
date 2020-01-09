@@ -16,10 +16,11 @@ MODEL_PATH = os.path.join('models', f'fasterrcnn_{model}.pt')
 def train(dataset):
     save_range = 40
     lamb = 10.0
+    rpn_lamb = 2.5
     n_classes = len(dataset.get_classes())
 
     fasterrcnn = FasterRCNN(n_classes, model=model, path=MODEL_PATH, training=True)
-    optimizer = optim.Adam(fasterrcnn.parameters(), lr = 0.0001)
+    optimizer = optim.Adam(fasterrcnn.parameters(), lr = 0.0003)
 
     for i in range(1, len(dataset)):
         im, bboxes, classes = dataset[i]
@@ -43,12 +44,12 @@ def train(dataset):
 
         fastrcnn_loss = fastrcnn_cls_loss + fastrcnn_reg_loss
         print(rpn_reg_loss, rpn_cls_loss, fastrcnn_reg_loss, fastrcnn_cls_loss)
-        loss = rpn_loss + fastrcnn_loss
+        loss = rpn_lamb * rpn_loss + fastrcnn_loss
 
         loss.backward()
         optimizer.step()
 
-        print('[%d] loss: %.5f'.format(i, loss.item()))
+        print('{} loss: {}'.format(i, loss.item()))
 
         if i % save_range == 0:
             torch.save(fasterrcnn.state_dict(), MODEL_PATH)

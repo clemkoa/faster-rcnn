@@ -61,7 +61,7 @@ class FasterRCNN(nn.Module):
         cls, reg = self.rpn(feature_map)
         feature_map = feature_map.view((-1, self.OUTPUT_SIZE[0], self.OUTPUT_SIZE[1]))
         if self.training:
-            proposals = self.rpn.get_proposals(reg, cls)
+            proposals = self.rpn.get_training_proposals(reg, cls)
         else:
             proposals = self.rpn.get_proposals(reg, cls)
 
